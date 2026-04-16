@@ -9,11 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
-# Data files (download separately)
-data/*.csv
-data/*.json
-data/*.parquet
-data/*.zip
+# Data directory is versioned; local dataset contents and symlinks are not
+data/*
 !data/.gitkeep
 
 # IDE
