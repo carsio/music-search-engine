@@ -63,7 +63,10 @@ src/music_search/
 
 ## Equipe
 
-- Carsio
+- [Carsio Eddyo](https://github.com/carsio)
+- [Carlos Alexandre](https://github.com/alexandrecarloss)
+- Raquel de Sá
+- Lelson Nascimento
 
 ## Licença
 
