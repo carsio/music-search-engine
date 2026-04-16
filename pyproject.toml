@@ -1,0 +1,52 @@
+[project]
+name = "music-search"
+version = "0.1.0"
+description = "Sistema de busca de músicas com técnicas de indexação e ranking — ICC222 UFAM"
+readme = "README.md"
+authors = [
+    { name = "Carsio", email = "carsio1256@gmail.com" },
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "jinja2>=3.1",
+    "pandas>=2.2",
+    "nltk>=3.9",
+    "scikit-learn>=1.6",
+    "rank-bm25>=0.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11",
+    "mypy>=1.15",
+    "pytest>=8.3",
+    "pytest-cov>=6.1",
+    "pre-commit>=4.2",
+    "ipykernel>=6.29",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["music_search"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
