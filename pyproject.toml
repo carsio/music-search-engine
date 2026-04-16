@@ -25,6 +25,7 @@ dev = [
     "pytest-cov>=6.1",
     "pre-commit>=4.2",
     "ipykernel>=6.29",
+    "kaggle>=2.0.1",
 ]
 
 [build-system]
