@@ -26,6 +26,12 @@ uv sync
 # Baixar dados do NLTK (primeira vez)
 uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
 
+# Verificar a CLI local do Kaggle
+uv run kaggle --version
+
+# Baixar o dataset no local padrão
+./scripts/download_spotify_metadata.sh
+
 # Rodar testes
 uv run pytest
 
@@ -39,11 +45,37 @@ uv run ruff format .
 
 ## Dados
 
-Baixe o dataset do Kaggle e coloque os arquivos CSV em `data/`:
+O diretório `data/` é versionado pelo repositório. Cada dataset deve ficar em uma subpasta dentro
+dele. Por padrão, o script deste projeto baixa o dataset do Spotify em
+`data/spotify-metadata`.
+
+Antes do download, gere sua credencial em `Kaggle > Settings > Create New Token` e salve o arquivo
+em `~/.kaggle/kaggle.json` com permissão restrita:
 
 ```bash
-# Via Kaggle CLI
-kaggle datasets download -d lordpatil/spotify-metadata-by-annas-archive -p data/ --unzip
+mkdir -p ~/.kaggle
+chmod 600 ~/.kaggle/kaggle.json
+```
+
+Depois, use o script do projeto para baixar o dataset no local padrão:
+
+```bash
+./scripts/download_spotify_metadata.sh
+```
+
+Se você quiser armazenar o dataset fora do repositório, passe um caminho explicitamente. Nesse
+caso, o script recria `data/spotify-metadata` como symlink para preservar o layout esperado pelo
+projeto:
+
+```bash
+./scripts/download_spotify_metadata.sh /caminho/para/datasets
+```
+
+O argumento pode ser a pasta base ou o diretório final do dataset:
+
+```bash
+./scripts/download_spotify_metadata.sh /caminho/para/datasets
+./scripts/download_spotify_metadata.sh /caminho/para/datasets/spotify-metadata
 ```
 
 ## Estrutura do projeto

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Sobre o projeto
 
-Sistema de busca de músicas que implementa e compara técnicas de indexação e ranking textual (índice invertido, TF-IDF, BM25) com métricas de avaliação de RI (Precision, Recall, MAP, nDCG). Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFAM 2026/1). Dataset: Spotify Metadata (Kaggle), arquivos CSV em `data/`.
+Sistema de busca de músicas que implementa e compara técnicas de indexação e ranking textual (índice invertido, TF-IDF, BM25) com métricas de avaliação de RI (Precision, Recall, MAP, nDCG). Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFAM 2026/1). Dataset: Spotify Metadata (Kaggle), exposto localmente em `data/spotify-metadata`.
 
 ## Comandos
 
@@ -30,6 +30,15 @@ uv run uvicorn music_search.web.app:app --reload
 
 # Setup inicial (NLTK, só precisa rodar uma vez)
 uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
+
+# CLI do Kaggle no contexto do projeto
+uv run kaggle --version
+
+# Download do dataset em data/spotify-metadata
+./scripts/download_spotify_metadata.sh
+
+# Download em outro caminho e recriacao do symlink local
+./scripts/download_spotify_metadata.sh /caminho/para/datasets
 ```
 
 ## Arquitetura
@@ -51,3 +60,5 @@ O pacote principal é `src/music_search/` (importado como `music_search`). O flu
 - Testes em `tests/` com pytest (flags: `-v --tb=short`)
 - Notebooks exploratórios em `notebooks/`
 - Todo código em português (docstrings, variáveis de domínio), APIs e nomes técnicos em inglês
+- `data/` deve continuar versionado; datasets locais ficam em subpastas, como `data/spotify-metadata`
+- Scripts de download devem preservar o layout `data/<dataset>`; symlinks são opcionais quando o usuário quiser armazenar dados fora do repositório
