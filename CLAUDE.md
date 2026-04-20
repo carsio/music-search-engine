@@ -18,7 +18,7 @@ Assuma que o usuário acabou de rodar `git clone` e está no diretório raiz do 
 uv sync --all-groups
 
 # 3. Dados do NLTK (só na primeira vez da máquina)
-uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
+uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('rslp')"
 
 # 4. Baixar e extrair o dataset truncado (~344 MB, padrão)
 ./scripts/download_spotify_metadata.sh --truncated
@@ -61,7 +61,7 @@ uv run mypy src/
 uv run uvicorn music_search.web.app:app --reload
 
 # Setup inicial (NLTK, só precisa rodar uma vez)
-uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
+uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('rslp')"
 
 # Dataset truncado (padrão, ~344 MB, via GitHub release v0.1-data)
 ./scripts/download_spotify_metadata.sh --truncated
