@@ -31,14 +31,14 @@ uv run uvicorn music_search.web.app:app --reload
 # Setup inicial (NLTK, só precisa rodar uma vez)
 uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
 
-# CLI do Kaggle no contexto do projeto
-uv run kaggle --version
+# Dataset truncado (padrão, ~344 MB, via GitHub release v0.1-data)
+./scripts/download_spotify_metadata.sh --truncated
 
-# Download do dataset em data/spotify-metadata
-./scripts/download_spotify_metadata.sh
+# Dataset completo (~5.5 GB, via Kaggle CLI)
+./scripts/download_spotify_metadata.sh --full
 
-# Download em outro caminho e recriacao do symlink local
-./scripts/download_spotify_metadata.sh /caminho/para/datasets
+# Destino alternativo (recria symlink em data/spotify-metadata)
+./scripts/download_spotify_metadata.sh --truncated /caminho/para/datasets
 ```
 
 ## Arquitetura
@@ -60,5 +60,7 @@ O pacote principal é `src/music_search/` (importado como `music_search`). O flu
 - Testes em `tests/` com pytest (flags: `-v --tb=short`)
 - Notebooks exploratórios em `notebooks/`
 - Todo código em português (docstrings, variáveis de domínio), APIs e nomes técnicos em inglês
-- `data/` deve continuar versionado; datasets locais ficam em subpastas, como `data/spotify-metadata`
+- `data/` é versionado mas `data/*` é gitignored; datasets locais ficam em `data/spotify-metadata/`
+- Código e notebooks **assumem que os parquets já estão em `data/spotify-metadata/`**. O download é função do script de apoio, não do pipeline.
+- Dois modos de bootstrap (`--truncated` default / `--full`) produzem o mesmo layout final — troca é transparente.
 - Scripts de download devem preservar o layout `data/<dataset>`; symlinks são opcionais quando o usuário quiser armazenar dados fora do repositório

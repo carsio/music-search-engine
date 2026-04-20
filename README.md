@@ -26,11 +26,11 @@ uv sync
 # Baixar dados do NLTK (primeira vez)
 uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
 
-# Verificar a CLI local do Kaggle
-uv run kaggle --version
+# Baixar o dataset truncado (padrão, ~344 MB)
+./scripts/download_spotify_metadata.sh --truncated
 
-# Baixar o dataset no local padrão
-./scripts/download_spotify_metadata.sh
+# Ou o dataset completo via Kaggle (~5.5 GB)
+./scripts/download_spotify_metadata.sh --full
 
 # Rodar testes
 uv run pytest
@@ -45,37 +45,49 @@ uv run ruff format .
 
 ## Dados
 
-O diretório `data/` é versionado pelo repositório. Cada dataset deve ficar em uma subpasta dentro
-dele. Por padrão, o script deste projeto baixa o dataset do Spotify em
-`data/spotify-metadata`.
+Código e notebooks **assumem** que `data/spotify-metadata/` já está populado com os parquets do
+dataset — nenhum download implícito. O diretório `data/` em si é versionado, mas o conteúdo
+(`data/*`) fica fora do git.
 
-Antes do download, gere sua credencial em `Kaggle > Settings > Create New Token` e salve o arquivo
-em `~/.kaggle/kaggle.json` com permissão restrita:
+Há dois modos de bootstrap, com o mesmo layout final:
+
+- **Truncado** (padrão, ~344 MB): subset empacotado como asset da release `v0.1-data` deste
+  repositório. Rápido o suficiente para iterar local.
+- **Full** (~5.5 GB): dataset completo via Kaggle CLI.
+
+```bash
+# Truncado (padrão)
+./scripts/download_spotify_metadata.sh --truncated
+
+# Full via Kaggle
+./scripts/download_spotify_metadata.sh --full
+```
+
+Troca entre os modos é transparente: o layout final é sempre
+`data/spotify-metadata/spotify_clean_parquet/*.parquet` + audio features. Notebooks e código
+de indexação não mudam.
+
+### Pré-requisitos por modo
+
+**Truncado**: precisa de `gh` autenticado *ou* `curl`. Se você já tiver o zip em
+`data/spotify-metadata-by-annas-archive-truncated-300mb.zip`, o script usa ele direto e pula o
+download.
+
+**Full**: precisa da credencial do Kaggle em `~/.kaggle/kaggle.json`:
 
 ```bash
 mkdir -p ~/.kaggle
 chmod 600 ~/.kaggle/kaggle.json
 ```
 
-Depois, use o script do projeto para baixar o dataset no local padrão:
+### Dataset fora do repositório
+
+Se quiser armazenar os arquivos extraídos fora do repo, passe um caminho posicional. O script
+recria `data/spotify-metadata` como symlink:
 
 ```bash
-./scripts/download_spotify_metadata.sh
-```
-
-Se você quiser armazenar o dataset fora do repositório, passe um caminho explicitamente. Nesse
-caso, o script recria `data/spotify-metadata` como symlink para preservar o layout esperado pelo
-projeto:
-
-```bash
-./scripts/download_spotify_metadata.sh /caminho/para/datasets
-```
-
-O argumento pode ser a pasta base ou o diretório final do dataset:
-
-```bash
-./scripts/download_spotify_metadata.sh /caminho/para/datasets
-./scripts/download_spotify_metadata.sh /caminho/para/datasets/spotify-metadata
+./scripts/download_spotify_metadata.sh --truncated /caminho/para/datasets
+./scripts/download_spotify_metadata.sh --full /caminho/para/datasets/spotify-metadata
 ```
 
 ## Estrutura do projeto
