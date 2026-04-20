@@ -18,7 +18,7 @@ jobs:
         run: uv sync
 
       - name: Download NLTK data
-        run: uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
+        run: uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('rslp')"
 
       - name: Lint
         run: uv run ruff check .
