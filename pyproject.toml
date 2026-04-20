@@ -15,6 +15,7 @@ dependencies = [
     "nltk>=3.9",
     "scikit-learn>=1.6",
     "rank-bm25>=0.2",
+    "duckdb>=1.0",
 ]
 
 [dependency-groups]
@@ -25,6 +26,11 @@ dev = [
     "pytest-cov>=6.1",
     "pre-commit>=4.2",
     "ipykernel>=6.29",
+    "kaggle>=2.0.1",
+    "matplotlib>=3.9",
+    "seaborn>=0.13",
+    "jupyter>=1.1",
+    "nbconvert>=7.16",
 ]
 
 [build-system]

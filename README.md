@@ -26,6 +26,12 @@ uv sync
 # Baixar dados do NLTK (primeira vez)
 uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
 
+# Baixar o dataset truncado (padrão, ~344 MB)
+./scripts/download_spotify_metadata.sh --truncated
+
+# Ou o dataset completo via Kaggle (~5.5 GB)
+./scripts/download_spotify_metadata.sh --full
+
 # Rodar testes
 uv run pytest
 
@@ -39,11 +45,49 @@ uv run ruff format .
 
 ## Dados
 
-Baixe o dataset do Kaggle e coloque os arquivos CSV em `data/`:
+Código e notebooks **assumem** que `data/spotify-metadata/` já está populado com os parquets do
+dataset — nenhum download implícito. O diretório `data/` em si é versionado, mas o conteúdo
+(`data/*`) fica fora do git.
+
+Há dois modos de bootstrap, com o mesmo layout final:
+
+- **Truncado** (padrão, ~344 MB): subset empacotado como asset da release `v0.1-data` deste
+  repositório. Rápido o suficiente para iterar local.
+- **Full** (~5.5 GB): dataset completo via Kaggle CLI.
 
 ```bash
-# Via Kaggle CLI
-kaggle datasets download -d lordpatil/spotify-metadata-by-annas-archive -p data/ --unzip
+# Truncado (padrão)
+./scripts/download_spotify_metadata.sh --truncated
+
+# Full via Kaggle
+./scripts/download_spotify_metadata.sh --full
+```
+
+Troca entre os modos é transparente: o layout final é sempre
+`data/spotify-metadata/spotify_clean_parquet/*.parquet` + audio features. Notebooks e código
+de indexação não mudam.
+
+### Pré-requisitos por modo
+
+**Truncado**: precisa de `gh` autenticado *ou* `curl`. Se você já tiver o zip em
+`data/spotify-metadata-by-annas-archive-truncated-300mb.zip`, o script usa ele direto e pula o
+download.
+
+**Full**: precisa da credencial do Kaggle em `~/.kaggle/kaggle.json`:
+
+```bash
+mkdir -p ~/.kaggle
+chmod 600 ~/.kaggle/kaggle.json
+```
+
+### Dataset fora do repositório
+
+Se quiser armazenar os arquivos extraídos fora do repo, passe um caminho posicional. O script
+recria `data/spotify-metadata` como symlink:
+
+```bash
+./scripts/download_spotify_metadata.sh --truncated /caminho/para/datasets
+./scripts/download_spotify_metadata.sh --full /caminho/para/datasets/spotify-metadata
 ```
 
 ## Estrutura do projeto
