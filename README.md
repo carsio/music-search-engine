@@ -110,7 +110,7 @@ src/music_search/
 - [Carsio Eddyo](https://github.com/carsio)
 - [Carlos Alexandre](https://github.com/alexandrecarloss)
 - Raquel de Sá
-- Lelson Nascimento
+- [Lelson Nascimento](https://github.com/lelsonln)
 
 ## Licença
 
