@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Motor de Busca Musical</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="deck-stage.js"></script>
+
+<script type="application/json" id="speaker-notes">
+[
+  "Bom dia, professor. Hoje vou apresentar o estado atual do projeto de motor de busca musical, que é o tema central do meu mestrado. O sistema é totalmente offline e lexical, construído sobre metadados do Spotify. Vou percorrer as nove etapas que já foram implementadas e indicar o que ainda está por vir.",
+  "A ideia central do projeto é transformar um corpus relacional de faixas do Spotify num motor de busca completo. Esse slide mostra o fluxo de ponta a ponta: partimos do dado bruto em parquet, passamos por um pipeline de pré-processamento, construímos um índice invertido offline e entregamos resultados ranqueados via BM25 ou TF-IDF. Cada bloco já tem implementação e testes automatizados.",
+  "Antes de escrever uma linha de busca, eu precisava garantir que o projeto fosse reproduzível. A escolha foi usar pyproject.toml como ponto central: ele define a versão travada do Python, as dependências resolvidas com uv, o lint e formato com ruff, tipagem estrita com mypy e os testes com pytest. O CI roda tudo isso em push e pull request, então nenhuma mudança entra no repositório sem passar pelo gate automático. Esse passo foi essencial antes de qualquer trabalho em equipe.",
+  "O corpus veio do Spotify via um script de download que suporta dois modos: truncado, para desenvolvimento rápido, e full, para o experimento final. O formato de saída é sempre o mesmo — parquet particionado em data/spotify-metadata — o que desacopla o resto do código do tamanho da base. A análise exploratória foi feita num notebook Jupyter e revelou a distribuição de artistas, idiomas e duração que guiou as decisões de pré-processamento.",
+  "O dataset original é relacional — tabelas separadas para tracks, albums e artists. O módulo datasets.py usa DuckDB para fazer os joins necessários e emitir um TrackDocument por faixa, com quatro campos: id, title, album e artist. A classe SpotifyTracksLoader expõe iter_docs e count, o que permite indexação em fluxo sem carregar tudo na memória. Esse ETL enxuto é o que transforma dado tabular em documento de recuperação de informação.",
+  "O pré-processamento é a etapa que garante que indexação e consulta usem exatamente a mesma representação textual. A pipeline tem quatro passos: normalize faz lowercase e remove acentos via NFD; tokenize segmenta com NLTK; remove_stopwords filtra com listas em português e inglês; e stem aplica RSLP para português e Snowball para inglês. O ponto crítico é que a função preprocess é chamada tanto no build do índice quanto na query, garantindo consistência total.",
+  "O núcleo estrutural da busca é o índice invertido multi-campo. Em vez de escanear todos os documentos a cada consulta, cada termo aponta para uma posting list organizada por campo — title, album e artist — com frequência por documento. O índice também armazena os comprimentos dos documentos por campo, que são essenciais para o BM25. O resultado é uma estrutura que responde à pergunta 'onde este termo ocorre' de forma instantânea.",
+  "O processo de build é offline e incremental. O IndexBuilder recebe documentos um a um, acumula frequências e depois compacta tudo em listas ordenadas. O script build_index.py usa o SpotifyTracksLoader, aplica o builder e salva o resultado com pickle via InvertedIndex.save. Em desenvolvimento usamos --limit 10000 para um índice menor; em produção acadêmica o mesmo processo escala para o corpus inteiro e gera um artefato reutilizável sem alterar nenhuma outra parte do código.",
+  "O BM25 é o primeiro modelo de relevância. Ele combina três sinais: frequência do termo no documento, raridade no corpus via IDF, e normalização pelo tamanho do documento com os hiperparâmetros k1 e b. A função rank monta o conjunto de candidatos direto das posting lists, o que reduz o custo computacional sem precisar varrer todos os documentos. O ponto importante é a saturação de TF: repetir um termo 20 vezes não vale 20 vezes mais — o BM25 aplica retorno decrescente.",
+  "O segundo modelo é TF-IDF com similaridade de cosseno. Cada termo recebe peso TF vezes IDF, com variantes de TF — raw, log e augmented — implementadas em tf_weight. Documento e consulta viram vetores esparsos e a relevância é o cosseno entre eles. A implementação pré-calcula e memoiza as normas dos documentos com cached_property, evitando recomputar a cada consulta. Uma query idêntica ao documento ideal deve retornar cosseno próximo de 1.",
+  "O projeto já tem uma base de testes significativa cobrindo preprocessing, indexer e ranking. Os testes não verificam só casos felizes: eles cobrem entradas inválidas, isolamento entre campos, ordenação estável, round-trip de serialização, comportamento matemático das fórmulas e equivalência entre query crua e pré-processada. Há um teste que compara o score do BM25 com a fórmula manual, e outro que verifica cosseno igual a 1 para documento idêntico à query. Isso transforma os testes em especificação executável do motor.",
+  "Para resumir: o motor lexical offline está completo. Temos corpus, pré-processamento, índice e dois modelos de ranking, tudo com testes e CI. O próximo bloco de trabalho é conectar o núcleo a query processing mais sofisticado, rodar avaliação experimental com métricas como MAP e NDCG, e construir uma interface de consulta. Não é refazer o núcleo — é expandir sobre uma base sólida. Fico à disposição para perguntas."
+]
+</script>
+
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1f2937;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: oklch(0.72 0.18 160);
+    --accent-dim: oklch(0.72 0.18 160 / 0.15);
+    --amber: oklch(0.78 0.18 55);
+    --amber-dim: oklch(0.78 0.18 55 / 0.12);
+    --purple: oklch(0.72 0.15 280);
+    --purple-dim: oklch(0.72 0.15 280 / 0.15);
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  /* ── Tweaks panel ── */
+  #tweaks-panel {
+    display: none;
+    position: fixed;
+    bottom: 72px;
+    right: 24px;
+    z-index: 9999;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px 24px 24px;
+    width: 280px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    color: #e6edf3;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  #tweaks-panel.visible { display: block; }
+  #tweaks-panel h3 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8b949e;
+    margin-bottom: 16px;
+  }
+  .tweak-row { margin-bottom: 16px; }
+  .tweak-row label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 8px; }
+  .tweak-swatches { display: flex; gap: 10px; }
+  .tweak-swatch {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid transparent; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .tweak-swatch.active, .tweak-swatch:hover { border-color: #e6edf3; }
+  .tweak-row input[type=range] { width: 100%; accent-color: var(--accent); }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  section {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+  }
+
+  /* ── Shared layout helpers ── */
+  .slide-inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 100px 120px 80px;
+  }
+
+  .slide-tag {
+    font-family: var(--mono);
+    font-size: 24px;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .slide-title {
+    font-size: 64px;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--text);
+    margin-bottom: 52px;
+  }
+
+  .slide-body {
+    font-size: 34px;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+
+  .slide-body strong { color: var(--text); font-weight: 600; }
+
+  /* Section header slides */
+  .section-slide {
+    background: var(--surface);
+  }
+  .section-slide .slide-inner {
+    justify-content: flex-end;
+    padding-bottom: 120px;
+  }
+  .section-num {
+    font-family: var(--mono);
+    font-size: 180px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--border);
+    position: absolute;
+    top: 60px;
+    right: 100px;
+    user-select: none;
+  }
+  .section-slide .slide-title {
+    font-size: 72px;
+    margin-bottom: 20px;
+  }
+  .section-slide .slide-subtitle {
+    font-size: 34px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  /* Code block */
+  .code-block {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 36px 40px;
+    font-family: var(--mono);
+    font-size: 26px;
+    line-height: 1.7;
+    color: #cdd9e5;
+  }
+  .code-block .k { color: oklch(0.72 0.15 280); }  /* keyword */
+  .code-block .s { color: oklch(0.72 0.18 160); }  /* string */
+  .code-block .c { color: var(--muted); font-style: italic; }  /* comment */
+  .code-block .n { color: var(--amber); }           /* name/var */
+  .code-block .p { color: #cdd9e5; }                /* punctuation */
+
+  /* Pipeline row */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 20px;
+  }
+  .pipe-step {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 24px;
+    text-align: center;
+  }
+  .pipe-step .ps-num {
+    font-family: var(--mono);
+    font-size: 24px;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .pipe-step .ps-label {
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .pipe-arrow {
+    color: var(--muted);
+    font-size: 28px;
+    padding: 0 12px;
+    flex-shrink: 0;
+  }
+
+  /* Two-column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    flex: 1;
+  }
+  .col-label {
+    font-family: var(--mono);
+    font-size: 24px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    letter-spacing: 0.04em;
+  }
+
+  /* Posting list diagram */
+  .posting-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .post-term {
+    font-family: var(--mono);
+    font-size: 26px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 8px 20px;
+    min-width: 160px;
+    text-align: center;
+  }
+  .post-arrow {
+    font-size: 24px;
+    color: var(--muted);
+  }
+  .post-list {
+    display: flex;
+    gap: 8px;
+  }
+  .post-entry {
+    font-family: var(--mono);
+    font-size: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 16px;
+    color: var(--text);
+  }
+
+  /* Formula display */
+  .formula-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 36px 48px;
+    font-family: var(--mono);
+    font-size: 28px;
+    line-height: 1.9;
+    color: #cdd9e5;
+    flex: 1;
+  }
+  .formula-box .f-label {
+    font-size: 24px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    font-family: var(--sans);
+  }
+  .formula-box .f-line { color: var(--text); }
+  .formula-box .f-var { color: var(--amber); }
+  .formula-box .f-val { color: var(--accent); }
+
+  /* Test item */
+  .test-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .test-item:last-child { border-bottom: none; }
+  .test-badge {
+    font-family: var(--mono);
+    font-size: 24px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+  .test-badge.pass { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent); }
+  .test-label { font-size: 30px; font-weight: 500; color: var(--text); line-height: 1.3; }
+  .test-desc { font-size: 24px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* Status bar */
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    margin-top: 20px;
+    flex: 1;
+  }
+  .status-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 32px 36px;
+  }
+  .status-card.done { border-color: oklch(0.72 0.18 160 / 0.4); }
+  .status-card.next { border-color: oklch(0.78 0.18 55 / 0.4); }
+  .sc-header {
+    font-family: var(--mono);
+    font-size: 24px;
+    margin-bottom: 20px;
+    letter-spacing: 0.04em;
+  }
+  .sc-header.done { color: var(--accent); }
+  .sc-header.next { color: var(--amber); }
+  .sc-items { list-style: none; }
+  .sc-items li {
+    font-size: 26px;
+    color: var(--text);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .sc-items li:last-child { border-bottom: none; }
+  .sc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .sc-dot.done { background: var(--accent); }
+  .sc-dot.next { background: var(--amber); }
+
+  /* Preproc chain */
+  .chain {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex: 1;
+  }
+  .chain-step {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+  .chain-connector {
+    width: 2px;
+    height: 28px;
+    background: var(--border);
+    margin-left: 39px;
+  }
+  .chain-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-dim);
+    flex-shrink: 0;
+  }
+  .chain-content {}
+  .chain-fn {
+    font-family: var(--mono);
+    font-size: 26px;
+    color: var(--amber);
+  }
+  .chain-desc {
+    font-size: 26px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* Big stat */
+  .big-stat {
+    font-size: 120px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  /* Horizontal rule */
+  .rule { height: 1px; background: var(--border); margin: 36px 0; }
+
+  /* Transition */
+  section { transition: none; }
+
+  /* Decorative grid lines bg */
+  .grid-bg {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 80px 80px;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<deck-stage width="1920" height="1080">
+
+  <!-- ═══════════════════════════════════════════
+       01 CAPA
+  ════════════════════════════════════════════ -->
+  <section data-label="Capa">
+    <div class="grid-bg"></div>
+    <div class="slide-inner" style="justify-content:center; gap:0; padding-top: 180px;">
+      <div style="font-family:var(--mono); font-size:24px; color:var(--accent); letter-spacing:0.1em; margin-bottom:36px;">
+        MESTRADO &nbsp;·&nbsp; RELATÓRIO DE PROGRESSO &nbsp;·&nbsp; ABRIL 2026
+      </div>
+      <h1 style="font-size:88px; font-weight:700; color:var(--text); line-height:1.05; margin-bottom:32px; max-width:1300px;">
+        Motor de Busca Musical
+      </h1>
+      <p style="font-size:40px; color:var(--muted); font-weight:400; margin-bottom:72px;">
+        Pipeline lexical offline sobre metadados do Spotify
+      </p>
+      <div style="display:flex; align-items:center; gap:20px;">
+        <span style="font-family:var(--mono); font-size:26px; color:var(--accent-dim); background:var(--accent-dim); border:1px solid var(--accent); border-radius:6px; padding:10px 24px; color:var(--accent);">Python</span>
+        <span style="font-family:var(--mono); font-size:26px; background:var(--amber-dim); border:1px solid var(--amber); border-radius:6px; padding:10px 24px; color:var(--amber);">BM25 + TF-IDF</span>
+        <span style="font-family:var(--mono); font-size:26px; background:var(--purple-dim); border:1px solid var(--purple); border-radius:6px; padding:10px 24px; color:var(--purple);">Índice Invertido</span>
+        <span style="font-family:var(--mono); font-size:26px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px 24px; color:var(--muted);">pytest · mypy · ruff</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       02 VISÃO GERAL
+  ════════════════════════════════════════════ -->
+  <section data-label="Visão Geral">
+    <div class="slide-inner">
+      <div class="slide-tag">Visão Geral</div>
+      <h2 class="slide-title">Pipeline de Ponta a Ponta</h2>
+      <div class="pipeline" style="margin-bottom:48px;">
+        <div class="pipe-step" style="border-color:var(--purple); background:var(--purple-dim);">
+          <div class="ps-num" style="color:var(--purple);">01–02</div>
+          <div class="ps-label" style="color:var(--purple);">Dataset<br>Spotify</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step">
+          <div class="ps-num">03</div>
+          <div class="ps-label">Loader<br>TrackDocument</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step">
+          <div class="ps-num">04</div>
+          <div class="ps-label">Pré-<br>processamento</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" style="border-color:var(--accent); background:var(--accent-dim);">
+          <div class="ps-num">05–06</div>
+          <div class="ps-label" style="color:var(--accent);">Índice<br>Invertido</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" style="border-color:var(--amber); background:var(--amber-dim);">
+          <div class="ps-num" style="color:var(--amber);">07–08</div>
+          <div class="ps-label" style="color:var(--amber);">Ranking<br>BM25 / TF-IDF</div>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:28px;">
+        <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:28px 28px;">
+          <div style="font-family:var(--mono); font-size:52px; font-weight:600; color:var(--accent); line-height:1;">9</div>
+          <div style="font-size:26px; color:var(--muted); margin-top:8px;">etapas entregues</div>
+        </div>
+        <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:28px 28px;">
+          <div style="font-family:var(--mono); font-size:52px; font-weight:600; color:var(--amber); line-height:1;">2</div>
+          <div style="font-size:26px; color:var(--muted); margin-top:8px;">modelos de ranking</div>
+        </div>
+        <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:28px 28px;">
+          <div style="font-family:var(--mono); font-size:52px; font-weight:600; color:var(--purple); line-height:1;">3</div>
+          <div style="font-size:26px; color:var(--muted); margin-top:8px;">suítes de testes</div>
+        </div>
+        <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:28px 28px;">
+          <div style="font-family:var(--mono); font-size:52px; font-weight:600; color:var(--text); line-height:1;">CI</div>
+          <div style="font-size:26px; color:var(--muted); margin-top:8px;">gate automático</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       03 SETUP
+  ════════════════════════════════════════════ -->
+  <section data-label="Setup" class="section-slide">
+    <div class="section-num">01</div>
+    <div class="slide-inner" style="justify-content:flex-start; padding-top:100px;">
+      <div class="slide-tag">Etapa 1</div>
+      <h2 class="slide-title" style="margin-bottom:36px;">Setup e Engenharia de Software</h2>
+      <div class="two-col" style="gap:48px; flex:1;">
+        <div>
+          <div class="col-label">// pyproject.toml</div>
+          <div class="code-block" style="font-size:24px; line-height:1.8;">
+            <span class="p">[tool.</span><span class="n">mypy</span><span class="p">]</span><br>
+            <span class="k">strict</span> <span class="p">=</span> <span class="s">true</span><br>
+            <br>
+            <span class="p">[tool.</span><span class="n">ruff</span><span class="p">]</span><br>
+            <span class="k">line-length</span> <span class="p">=</span> <span class="s">88</span><br>
+            <br>
+            <span class="p">[tool.</span><span class="n">pytest</span><span class="p">]</span><br>
+            <span class="k">testpaths</span> <span class="p">=</span> <span class="s">["tests"]</span>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:24px; justify-content:flex-start; padding-top:42px;">
+          <div style="display:flex; align-items:center; gap:20px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:24px 28px;">
+            <span style="font-family:var(--mono); font-size:26px; color:var(--accent);">uv</span>
+            <span style="font-size:26px; color:var(--muted);">resolução de dependências</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:20px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:24px 28px;">
+            <span style="font-family:var(--mono); font-size:26px; color:var(--amber);">ruff</span>
+            <span style="font-size:26px; color:var(--muted);">lint e formatação</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:20px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:24px 28px;">
+            <span style="font-family:var(--mono); font-size:26px; color:var(--purple);">mypy</span>
+            <span style="font-size:26px; color:var(--muted);">tipagem estrita</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:20px; background:var(--accent-dim); border:1px solid var(--accent); border-radius:8px; padding:24px 28px;">
+            <span style="font-family:var(--mono); font-size:26px; color:var(--accent);">CI</span>
+            <span style="font-size:26px; color:var(--text);">gate em push e pull_request</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       04 AQUISIÇÃO DE DADOS
+  ════════════════════════════════════════════ -->
+  <section data-label="Dados">
+    <div class="slide-inner">
+      <div class="slide-tag">Etapa 2</div>
+      <h2 class="slide-title">Aquisição de Dados e EDA</h2>
+      <div class="two-col">
+        <div>
+          <div class="col-label">// download_spotify_metadata.sh</div>
+          <div class="code-block" style="font-size:24px; line-height:1.8;">
+            <span class="c"># modo truncado (dev)</span><br>
+            <span class="k">MODE</span>=<span class="s">truncated</span> ./download.sh<br>
+            <br>
+            <span class="c"># modo full (produção)</span><br>
+            <span class="k">MODE</span>=<span class="s">full</span> ./download.sh<br>
+            <br>
+            <span class="c"># saída invariante</span><br>
+            <span class="n">data/spotify-metadata/</span><br>
+            <span class="n">  spotify_clean_parquet/</span>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:24px; padding-top:42px;">
+          <p style="font-size:30px; color:var(--muted); line-height:1.6;">
+            Ambos os modos convergem para <strong style="color:var(--text);">o mesmo layout</strong> em parquet, desacoplando o código do tamanho do corpus.
+          </p>
+          <div class="rule"></div>
+          <div style="display:flex; gap:28px;">
+            <div style="text-align:center;">
+              <div style="font-family:var(--mono); font-size:52px; font-weight:600; color:var(--accent); line-height:1;">4</div>
+              <div style="font-size:24px; color:var(--muted); margin-top:6px;">tabelas relacionais</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-family:var(--mono); font-size:52px; font-weight:600; color:var(--amber); line-height:1;">1</div>
+              <div style="font-size:24px; color:var(--muted); margin-top:6px;">notebook de EDA</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-family:var(--mono); font-size:52px; font-weight:600; color:var(--purple); line-height:1;">PT/EN</div>
+              <div style="font-size:24px; color:var(--muted); margin-top:6px;">idiomas no corpus</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       05 MODELAGEM DE DOCUMENTOS
+  ════════════════════════════════════════════ -->
+  <section data-label="Documentos" class="section-slide">
+    <div class="section-num">03</div>
+    <div class="slide-inner" style="padding-top:100px; width:1965px;">
+      <div class="slide-tag">Etapa 3</div>
+      <h2 class="slide-title" style="margin-bottom:36px;">Modelagem de Documentos</h2>
+      <div class="two-col">
+        <div>
+          <div class="col-label">// datasets.py — TrackDocument</div>
+          <div class="code-block" style="font-size:24px; line-height:1.8;">
+            <span class="k">@dataclass</span><br>
+            <span class="k">class</span> <span class="n">TrackDocument</span><span class="p">:</span><br>
+            &nbsp;&nbsp;<span class="n">id</span><span class="p">:</span> <span class="s">str</span><br>
+            &nbsp;&nbsp;<span class="n">title</span><span class="p">:</span> <span class="s">str</span><br>
+            &nbsp;&nbsp;<span class="n">album</span><span class="p">:</span> <span class="s">str</span><br>
+            &nbsp;&nbsp;<span class="n">artist</span><span class="p">:</span> <span class="s">str</span><br>
+            <br>
+            <span class="k">class</span> <span class="n">SpotifyTracksLoader</span><span class="p">:</span><br>
+            &nbsp;&nbsp;<span class="k">def</span> <span class="n">iter_docs</span><span class="p">()</span> <span class="p">→</span> <span class="s">Iterator[TrackDocument]</span><br>
+            &nbsp;&nbsp;<span class="k">def</span> <span class="n">count</span><span class="p">()</span> <span class="p">→</span> <span class="s">int</span>
+          </div>
+        </div>
+        <div style="padding-top:42px;">
+          <div class="col-label">// exemplo</div>
+          <div class="code-block" style="font-size:24px; line-height:1.8;">
+            <span class="n">TrackDocument</span><span class="p">(</span><br>
+            &nbsp;&nbsp;<span class="n">id</span><span class="p">=</span><span class="s">"6rqhFgbbKwnb9MLmUQDhG6"</span><span class="p">,</span><br>
+            &nbsp;&nbsp;<span class="n">title</span><span class="p">=</span><span class="s">"As Canções de Amor"</span><span class="p">,</span><br>
+            &nbsp;&nbsp;<span class="n">album</span><span class="p">=</span><span class="s">"Emoções"</span><span class="p">,</span><br>
+            &nbsp;&nbsp;<span class="n">artist</span><span class="p">=</span><span class="s">"Roberto Carlos"</span><br>
+            <span class="p">)</span>
+          </div>
+          <p style="font-size:26px; color:var(--muted); margin-top:28px; line-height:1.6;">
+            DuckDB faz os joins em runtime — <strong style="color:var(--text);">sem carregar tudo em memória</strong>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       06 PRÉ-PROCESSAMENTO
+  ════════════════════════════════════════════ -->
+  <section data-label="Préprocessamento">
+    <div class="slide-inner">
+      <div class="slide-tag">Etapa 4</div>
+      <h2 class="slide-title">Pré-processamento Textual</h2>
+      <div class="two-col" style="gap:60px;">
+        <div class="chain">
+          <div class="chain-step">
+            <div class="chain-icon">1</div>
+            <div class="chain-content">
+              <div class="chain-fn">normalize()</div>
+              <div class="chain-desc">lowercase · remove acentos (NFD) · limpa non-alphanum</div>
+            </div>
+          </div>
+          <div class="chain-connector"></div>
+          <div class="chain-step">
+            <div class="chain-icon">2</div>
+            <div class="chain-content">
+              <div class="chain-fn">tokenize()</div>
+              <div class="chain-desc">segmentação com NLTK</div>
+            </div>
+          </div>
+          <div class="chain-connector"></div>
+          <div class="chain-step">
+            <div class="chain-icon">3</div>
+            <div class="chain-content">
+              <div class="chain-fn">remove_stopwords()</div>
+              <div class="chain-desc">listas PT + EN</div>
+            </div>
+          </div>
+          <div class="chain-connector"></div>
+          <div class="chain-step">
+            <div class="chain-icon">4</div>
+            <div class="chain-content">
+              <div class="chain-fn">stem()</div>
+              <div class="chain-desc">RSLP (PT) · Snowball (EN)</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding-top:42px; display:flex; flex-direction:column; gap:24px;">
+          <div class="col-label">// transformação de exemplo</div>
+          <div class="code-block" style="font-size:24px; line-height:1.9;">
+            <span class="s">"As Canções de Amor!!!"</span><br>
+            <span class="c">→ normalize</span>&nbsp;&nbsp;<span class="n">"as cancoes de amor"</span><br>
+            <span class="c">→ tokenize</span>&nbsp;&nbsp;<span class="n">["as","cancoes","de","amor"]</span><br>
+            <span class="c">→ stopwords</span>&nbsp;<span class="n">["cancoes", "amor"]</span><br>
+            <span class="c">→ stem</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="n">["canco", "am"]</span>
+          </div>
+          <p style="font-size:26px; color:var(--muted); line-height:1.6;">
+            <strong style="color:var(--accent);">preprocess()</strong> é chamada igualmente em build e em query — garantia de consistência.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       07 ÍNDICE INVERTIDO
+  ════════════════════════════════════════════ -->
+  <section data-label="Índice Invertido" class="section-slide">
+    <div class="section-num">05</div>
+    <div class="slide-inner" style="padding-top:100px;">
+      <div class="slide-tag">Etapa 5</div>
+      <h2 class="slide-title" style="margin-bottom:36px;">Índice Invertido Multi-campo</h2>
+      <div class="col-label" style="margin-bottom:28px;">// estrutura — postings[field][term] = [(doc_id, tf), ...]</div>
+      <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:12px;">
+        <div style="font-family:var(--mono); font-size:24px; color:var(--muted); margin-bottom:12px;">campo: title</div>
+        <div class="posting-row">
+          <div class="post-term">am</div>
+          <div class="post-arrow">→</div>
+          <div class="post-list">
+            <div class="post-entry">(0, 1)</div>
+            <div class="post-entry">(1, 1)</div>
+            <div class="post-entry">(3, 2)</div>
+            <div style="font-family:var(--mono); font-size:24px; color:var(--muted); padding:8px 12px;">...</div>
+          </div>
+        </div>
+        <div class="posting-row">
+          <div class="post-term">canco</div>
+          <div class="post-arrow">→</div>
+          <div class="post-list">
+            <div class="post-entry">(0, 1)</div>
+            <div class="post-entry">(4, 3)</div>
+            <div style="font-family:var(--mono); font-size:24px; color:var(--muted); padding:8px 12px;">...</div>
+          </div>
+        </div>
+        <div class="posting-row">
+          <div class="post-term">rock</div>
+          <div class="post-arrow">→</div>
+          <div class="post-list">
+            <div class="post-entry">(2, 1)</div>
+            <div class="post-entry">(5, 2)</div>
+            <div class="post-entry">(7, 1)</div>
+            <div style="font-family:var(--mono); font-size:24px; color:var(--muted); padding:8px 12px;">...</div>
+          </div>
+        </div>
+        <div style="margin-top:20px; padding:24px 28px; background:var(--accent-dim); border:1px solid var(--accent); border-radius:8px;">
+          <p style="font-size:28px; color:var(--text);">Também armazena <strong>doc_lengths[field][doc_id]</strong> — essencial para normalização do BM25.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       08 BUILD DO ÍNDICE
+  ════════════════════════════════════════════ -->
+  <section data-label="Build do Índice">
+    <div class="slide-inner">
+      <div class="slide-tag">Etapa 6</div>
+      <h2 class="slide-title">Construção e Persistência do Índice</h2>
+      <div class="two-col">
+        <div>
+          <div class="col-label">// build_index.py</div>
+          <div class="code-block" style="font-size:24px; line-height:1.8;">
+            <span class="n">loader</span> <span class="p">=</span> <span class="n">SpotifyTracksLoader</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><br>
+            <span class="n">builder</span> <span class="p">=</span> <span class="n">IndexBuilder</span><span class="p">()</span><br>
+            <br>
+            <span class="k">for</span> <span class="n">doc</span> <span class="k">in</span> <span class="n">loader</span><span class="p">.</span><span class="n">iter_docs</span><span class="p">():</span><br>
+            &nbsp;&nbsp;<span class="n">builder</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span><br>
+            <br>
+            <span class="n">index</span> <span class="p">=</span> <span class="n">builder</span><span class="p">.</span><span class="n">build</span><span class="p">()</span><br>
+            <span class="n">InvertedIndex</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="s">path</span><span class="p">)</span>
+          </div>
+        </div>
+        <div style="padding-top:42px; display:flex; flex-direction:column; gap:28px;">
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:28px 32px;">
+            <div style="font-family:var(--mono); font-size:24px; color:var(--muted); margin-bottom:12px;">dev (rápido)</div>
+            <div style="font-family:var(--mono); font-size:26px; color:var(--amber);">--limit 10000</div>
+          </div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:28px 32px;">
+            <div style="font-family:var(--mono); font-size:24px; color:var(--muted); margin-bottom:12px;">produção acadêmica</div>
+            <div style="font-family:var(--mono); font-size:26px; color:var(--accent);">corpus completo</div>
+          </div>
+          <p style="font-size:26px; color:var(--muted); line-height:1.6;">
+            Persistência via <strong style="color:var(--text);">pickle</strong> — artefato reutilizável sem re-indexar.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       09 BM25
+  ════════════════════════════════════════════ -->
+  <section data-label="BM25" class="section-slide">
+    <div class="section-num">07</div>
+    <div class="slide-inner" style="padding-top:100px;">
+      <div class="slide-tag">Etapa 7</div>
+      <h2 class="slide-title" style="margin-bottom:36px;">Ranking com BM25</h2>
+      <div class="two-col" style="gap:48px;">
+        <div class="formula-box">
+          <div class="f-label">Fórmula BM25 por campo</div>
+          <div class="f-line">score(q, d) = Σ <span class="f-val">IDF(t)</span> ·</div>
+          <div class="f-line" style="padding-left:60px;">
+            <span class="f-var">tf</span> · (<span class="f-var">k1</span> + 1)
+          </div>
+          <div class="f-line" style="padding-left:60px;">
+            ─────────────────────
+          </div>
+          <div class="f-line" style="padding-left:60px;">
+            <span class="f-var">tf</span> + <span class="f-var">k1</span> · (1 − <span class="f-var">b</span> + <span class="f-var">b</span> · <span class="f-val">|d|</span>/<span class="f-val">avgdl</span>)
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:24px; justify-content:center;">
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:24px 28px;">
+            <div style="font-size:24px; color:var(--muted); margin-bottom:8px;">Saturação de TF</div>
+            <div style="font-size:28px; color:var(--text);">Repetir "amor" 20× <strong style="color:var(--amber);">não vale 20×</strong> mais — retorno decrescente.</div>
+          </div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:24px 28px;">
+            <div style="font-size:24px; color:var(--muted); margin-bottom:8px;">Candidatos via posting lists</div>
+            <div style="font-size:28px; color:var(--text);">Rank não varre todos os documentos — só os que contêm termos da query.</div>
+          </div>
+          <div style="background:var(--accent-dim); border:1px solid var(--accent); border-radius:8px; padding:24px 28px;">
+            <div style="font-size:28px; color:var(--text);">Hiperparâmetros: <strong style="color:var(--accent);">k1</strong> (saturação) e <strong style="color:var(--accent);">b</strong> (normalização de comprimento)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       10 TF-IDF
+  ════════════════════════════════════════════ -->
+  <section data-label="TF-IDF">
+    <div class="slide-inner">
+      <div class="slide-tag">Etapa 8</div>
+      <h2 class="slide-title">Ranking com TF-IDF e Cosseno</h2>
+      <div class="two-col" style="gap:48px;">
+        <div class="formula-box">
+          <div class="f-label">Peso por termo</div>
+          <div class="f-line">w(t, d) = <span class="f-var">tf_weight</span>(t, d) · <span class="f-val">idf</span>(t)</div>
+          <br>
+          <div class="f-label">Variantes de TF</div>
+          <div class="f-line"><span class="f-var">raw</span> · <span class="f-var">log</span> · <span class="f-var">augmented</span></div>
+          <br>
+          <div class="f-label">Similaridade de cosseno</div>
+          <div class="f-line">sim(q, d) =</div>
+          <div class="f-line" style="padding-left:40px;"><span class="f-val">q</span> · <span class="f-val">d</span></div>
+          <div class="f-line" style="padding-left:40px;">──────────</div>
+          <div class="f-line" style="padding-left:40px;">‖<span class="f-val">q</span>‖ · ‖<span class="f-val">d</span>‖</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:24px; justify-content:center;">
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:24px 28px;">
+            <div style="font-size:24px; color:var(--muted); margin-bottom:8px;">IDF discriminante</div>
+            <div style="font-size:28px; color:var(--text);">Termos ubíquos como "de" têm IDF ≈ 0 — <strong style="color:var(--amber);">não discriminam</strong>.</div>
+          </div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:24px 28px;">
+            <div style="font-size:24px; color:var(--muted); margin-bottom:8px;">Normas memoizadas</div>
+            <div style="font-size:28px; color:var(--text);"><strong style="color:var(--text);">cached_property</strong> — normas de documentos pré-calculadas, evita recompute por query.</div>
+          </div>
+          <div style="background:var(--purple-dim); border:1px solid var(--purple); border-radius:8px; padding:24px 28px;">
+            <div style="font-size:28px; color:var(--text);">Query idêntica ao documento → cosseno <strong style="color:var(--purple);">≈ 1</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       11 TESTES
+  ════════════════════════════════════════════ -->
+  <section data-label="Testes" class="section-slide">
+    <div class="section-num">09</div>
+    <div class="slide-inner" style="padding-top:100px;">
+      <div class="slide-tag">Etapa 9</div>
+      <h2 class="slide-title" style="margin-bottom:36px;">Testes e Validação</h2>
+      <div>
+        <div class="test-item">
+          <div class="test-badge pass">PASS</div>
+          <div>
+            <div class="test-label">test_preprocessing.py</div>
+            <div class="test-desc">normalização, tokenização, stopwords, stemming em PT e EN; entradas inválidas</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <div class="test-badge pass">PASS</div>
+          <div>
+            <div class="test-label">test_indexer.py</div>
+            <div class="test-desc">isolamento por campo, ordenação de posting lists, round-trip de persistência</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <div class="test-badge pass">PASS</div>
+          <div>
+            <div class="test-label">test_ranking.py</div>
+            <div class="test-desc">score BM25 vs. fórmula manual; cosseno = 1 para documento idêntico; ordenação estável</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:32px; padding:24px 28px; background:var(--accent-dim); border:1px solid var(--accent); border-radius:8px;">
+        <p style="font-size:28px; color:var(--text);">Os testes funcionam como <strong style="color:var(--accent);">especificação executável</strong> do motor — pequenos erros de fórmula geram resultados silenciosamente ruins.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       12 PRÓXIMOS PASSOS
+  ════════════════════════════════════════════ -->
+  <section data-label="Próximos Passos">
+    <div class="slide-inner">
+      <div class="slide-tag">Estado Atual e Próximos Passos</div>
+      <h2 class="slide-title">O que já temos · O que vem a seguir</h2>
+      <div class="status-grid">
+        <div class="status-card done">
+          <div class="sc-header done">// entregue</div>
+          <ul class="sc-items">
+            <li><span class="sc-dot done"></span>Setup e CI automático</li>
+            <li><span class="sc-dot done"></span>Dataset + EDA</li>
+            <li><span class="sc-dot done"></span>Loader e modelagem</li>
+            <li><span class="sc-dot done"></span>Pré-processamento PT/EN</li>
+            <li><span class="sc-dot done"></span>Índice invertido multi-campo</li>
+          </ul>
+        </div>
+        <div class="status-card done">
+          <div class="sc-header done">// entregue</div>
+          <ul class="sc-items">
+            <li><span class="sc-dot done"></span>Build + persistência do índice</li>
+            <li><span class="sc-dot done"></span>Ranking BM25</li>
+            <li><span class="sc-dot done"></span>Ranking TF-IDF + cosseno</li>
+            <li><span class="sc-dot done"></span>Suítes de teste (3 módulos)</li>
+          </ul>
+        </div>
+        <div class="status-card next">
+          <div class="sc-header next">// próximas etapas</div>
+          <ul class="sc-items">
+            <li><span class="sc-dot next"></span>Query processing avançado</li>
+            <li><span class="sc-dot next"></span>Avaliação: MAP · NDCG</li>
+            <li><span class="sc-dot next"></span>Interface de consulta</li>
+            <li><span class="sc-dot next"></span>Experimentos comparativos</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</deck-stage>
+
+<!-- Tweaks panel -->
+<div id="tweaks-panel">
+  <h3>Tweaks</h3>
+  <div class="tweak-row">
+    <label>Cor de destaque</label>
+    <div class="tweak-swatches">
+      <div class="tweak-swatch active" data-accent="oklch(0.72 0.18 160)" data-accent-dim="oklch(0.72 0.18 160 / 0.15)" style="background:oklch(0.72 0.18 160)" title="Teal"></div>
+      <div class="tweak-swatch" data-accent="oklch(0.72 0.18 30)" data-accent-dim="oklch(0.72 0.18 30 / 0.15)" style="background:oklch(0.72 0.18 30)" title="Coral"></div>
+      <div class="tweak-swatch" data-accent="oklch(0.72 0.15 250)" data-accent-dim="oklch(0.72 0.15 250 / 0.15)" style="background:oklch(0.72 0.15 250)" title="Blue"></div>
+      <div class="tweak-swatch" data-accent="oklch(0.78 0.18 55)" data-accent-dim="oklch(0.78 0.18 55 / 0.12)" style="background:oklch(0.78 0.18 55)" title="Amber"></div>
+    </div>
+  </div>
+  <div class="tweak-row">
+    <label>Fundo: <span id="bg-val">escuro</span></label>
+    <input type="range" id="bg-slider" min="0" max="2" step="1" value="0">
+  </div>
+  <div class="tweak-row">
+    <label>Tamanho de fonte: <span id="fs-val">100%</span></label>
+    <input type="range" id="fs-slider" min="80" max="120" step="5" value="100">
+  </div>
+</div>
+
+<script>
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentIdx": 0,
+  "bgIdx": 1,
+  "fontSize": 100
+}/*EDITMODE-END*/;
+
+(function() {
+  const panel = document.getElementById('tweaks-panel');
+  const root = document.documentElement;
+
+  const accents = [
+    { accent: 'oklch(0.72 0.18 160)', dim: 'oklch(0.72 0.18 160 / 0.15)' },
+    { accent: 'oklch(0.72 0.18 30)',  dim: 'oklch(0.72 0.18 30 / 0.15)' },
+    { accent: 'oklch(0.72 0.15 250)', dim: 'oklch(0.72 0.15 250 / 0.15)' },
+    { accent: 'oklch(0.78 0.18 55)',  dim: 'oklch(0.78 0.18 55 / 0.12)' },
+  ];
+  const bgs = ['#0d1117', '#111827', '#1a1a2e'];
+  const bgLabels = ['escuro', 'grafite', 'azul-noite'];
+
+  function applyAccent(idx) {
+    root.style.setProperty('--accent', accents[idx].accent);
+    root.style.setProperty('--accent-dim', accents[idx].dim);
+    document.querySelectorAll('.tweak-swatch').forEach((s, i) =>
+      s.classList.toggle('active', i === idx));
+  }
+
+  function applyBg(idx) {
+    root.style.setProperty('--bg', bgs[idx]);
+    document.getElementById('bg-val').textContent = bgLabels[idx];
+  }
+
+  function applyFontSize(pct) {
+    root.style.fontSize = pct + '%';
+    document.getElementById('fs-val').textContent = pct + '%';
+  }
+
+  // Apply defaults
+  applyAccent(TWEAK_DEFAULTS.accentIdx);
+  applyBg(TWEAK_DEFAULTS.bgIdx);
+  applyFontSize(TWEAK_DEFAULTS.fontSize);
+  document.getElementById('bg-slider').value = TWEAK_DEFAULTS.bgIdx;
+  document.getElementById('fs-slider').value = TWEAK_DEFAULTS.fontSize;
+
+  // Swatch clicks
+  document.querySelectorAll('.tweak-swatch').forEach((swatch, idx) => {
+    swatch.addEventListener('click', () => {
+      applyAccent(idx);
+      window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { accentIdx: idx } }, '*');
+    });
+  });
+
+  // Bg slider
+  document.getElementById('bg-slider').addEventListener('input', e => {
+    const v = +e.target.value;
+    applyBg(v);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { bgIdx: v } }, '*');
+  });
+
+  // Font slider
+  document.getElementById('fs-slider').addEventListener('input', e => {
+    const v = +e.target.value;
+    applyFontSize(v);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { fontSize: v } }, '*');
+  });
+
+  // Host messaging — register FIRST, then announce
+  window.addEventListener('message', e => {
+    if (e.data?.type === '__activate_edit_mode') panel.classList.add('visible');
+    if (e.data?.type === '__deactivate_edit_mode') panel.classList.remove('visible');
+  });
+  window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+})();
+</script>
+</body>
+</html>
