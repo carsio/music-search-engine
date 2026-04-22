@@ -4,6 +4,8 @@
 
 Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFAM 2026/1).
 
+📊 **Slides da apresentação:** https://carsio.github.io/music-search-engine/
+
 ## Sobre
 
 Sistema de busca de músicas que implementa e compara diferentes técnicas de indexação e ranking textual, utilizando o dataset [Spotify Metadata](https://www.kaggle.com/datasets/lordpatil/spotify-metadata-by-annas-archive) como base de dados.
@@ -109,7 +111,7 @@ src/music_search/
 
 - [Carsio Eddyo](https://github.com/carsio)
 - [Carlos Alexandre](https://github.com/alexandrecarloss)
-- Raquel de Sá
+- [Raquel de Sá](https://github.com/raqueldesa)
 - [Lelson Nascimento](https://github.com/lelsonln)
 
 ## Licença
