@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Sobre o projeto
 
-Sistema de busca de músicas que implementa e compara técnicas de indexação e ranking textual (índice invertido, TF-IDF, BM25) com métricas de avaliação de RI (Precision, Recall, MAP, nDCG). Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFAM 2026/1). Dataset: Spotify Metadata (Kaggle), exposto localmente em `data/spotify-metadata`.
+Sistema de busca de músicas que implementa e compara técnicas de indexação e ranking textual (índice invertido, TF-IDF, BM25) e vetorial (embeddings + similaridade de cosseno em Milvus), com métricas de avaliação de RI (Precision, Recall, MAP, nDCG). Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFAM 2026/1). Dataset: Spotify Metadata (Kaggle), exposto localmente em `data/spotify-metadata`.
 
 ## Setup após clonar
 
@@ -16,6 +16,10 @@ Assuma que o usuário acabou de rodar `git clone` e está no diretório raiz do 
 
 # 2. Sincronizar dependências (runtime + dev + notebooks)
 uv sync --all-groups
+
+# 2b. (Opcional) Dependências da busca vetorial (pymilvus, openai, tqdm)
+#     Só necessário se for rodar o pipeline em src/music_search/vector/.
+# uv sync --all-groups --extra vector
 
 # 3. Dados do NLTK (só na primeira vez da máquina)
 uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('rslp')"
@@ -83,6 +87,7 @@ O pacote principal é `src/music_search/` (importado como `music_search`). O flu
 4. **search** — processamento de queries, orquestra preprocessing + indexer + ranking
 5. **evaluation** — métricas de avaliação (Precision, Recall, MAP, nDCG)
 6. **web/app** — interface web FastAPI que expõe o motor de busca
+7. **vector** (opcional, extra `vector`) — pipeline denso: embeddings + Milvus. `vector.indexing` gera os vetores a partir de `SpotifyTracksLoader.iter_rich_docs()`; `vector.search.VectorSearch` responde queries por similaridade de cosseno. Artefatos em `data/vector/`.
 
 ## Convenções
 

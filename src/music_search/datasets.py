@@ -28,6 +28,28 @@ class TrackDocument(TypedDict):
     artist: str
 
 
+class RichTrackDocument(TypedDict, total=False):
+    """Documento de track enriquecido, usado pela indexação vetorial.
+
+    Inclui campos textuais e numéricos adicionais (gêneros, popularidades,
+    duração, data de lançamento) usados para compor o texto de embedding e
+    para metadados da base vetorial.
+    """
+
+    id: str
+    track_name: str
+    album_name: str
+    artist_names: str
+    artist_genres: str
+    album_type: str
+    label: str
+    release_date: str
+    track_popularity: int
+    album_popularity: int
+    duration_ms: int
+    explicit: bool
+
+
 @dataclass(frozen=True)
 class SpotifyTracksLoader:
     """Lê tracks + albums + artists dos parquets e emite um doc por track."""
@@ -85,8 +107,80 @@ class SpotifyTracksLoader:
         finally:
             con.close()
 
-    def _ensure_files_exist(self) -> None:
+    def _rich_query(self, limit: int | None = None) -> str:
+        tracks = (self.parquet_dir / "tracks.parquet").as_posix()
+        albums = (self.parquet_dir / "albums.parquet").as_posix()
+        artists = (self.parquet_dir / "artists.parquet").as_posix()
+        track_artists = (self.parquet_dir / "track_artists.parquet").as_posix()
+        artist_genres = (self.parquet_dir / "artist_genres.parquet").as_posix()
+        limit_clause = f"LIMIT {int(limit)}" if limit else ""
+        return f"""
+            WITH artistas_por_track AS (
+                SELECT
+                    ta.track_rowid,
+                    string_agg(DISTINCT ar.name,  ' | ' ORDER BY ar.name)  AS artist_names,
+                    string_agg(DISTINCT ag.genre, ' | ' ORDER BY ag.genre) AS genres
+                FROM '{track_artists}' ta
+                LEFT JOIN '{artists}' ar       ON ar.rowid = ta.artist_rowid
+                LEFT JOIN '{artist_genres}' ag ON ag.artist_rowid = ta.artist_rowid
+                GROUP BY ta.track_rowid
+            )
+            SELECT
+                t.id                        AS id,
+                COALESCE(t.name, '')        AS track_name,
+                COALESCE(a.name, '')        AS album_name,
+                COALESCE(apt.artist_names, '') AS artist_names,
+                COALESCE(apt.genres, '')    AS artist_genres,
+                COALESCE(a.album_type, '')  AS album_type,
+                COALESCE(a.label, '')       AS label,
+                COALESCE(CAST(a.release_date AS VARCHAR), '') AS release_date,
+                COALESCE(t.popularity, 0)   AS track_popularity,
+                COALESCE(a.popularity, 0)   AS album_popularity,
+                COALESCE(t.duration_ms, 0)  AS duration_ms,
+                COALESCE(t.explicit, FALSE) AS explicit
+            FROM '{tracks}' t
+            LEFT JOIN '{albums}' a      ON t.album_rowid = a.rowid
+            LEFT JOIN artistas_por_track apt ON apt.track_rowid = t.rowid
+            {limit_clause}
+        """
+
+    def iter_rich_docs(self, limit: int | None = None) -> Iterator[RichTrackDocument]:
+        """Itera documentos enriquecidos para indexação vetorial.
+
+        Diferente de `iter_docs`, inclui gêneros, popularidades, data de
+        lançamento, tipo de álbum e label — campos úteis para compor texto
+        de embedding e metadados na base vetorial.
+        """
+        self._ensure_files_exist(rich=True)
+        con = duckdb.connect()
+        try:
+            cursor = con.execute(self._rich_query(limit))
+            while True:
+                rows = cursor.fetchmany(10_000)
+                if not rows:
+                    break
+                for row in rows:
+                    yield RichTrackDocument(
+                        id=str(row[0]),
+                        track_name=row[1] or "",
+                        album_name=row[2] or "",
+                        artist_names=row[3] or "",
+                        artist_genres=row[4] or "",
+                        album_type=row[5] or "",
+                        label=row[6] or "",
+                        release_date=row[7] or "",
+                        track_popularity=int(row[8] or 0),
+                        album_popularity=int(row[9] or 0),
+                        duration_ms=int(row[10] or 0),
+                        explicit=bool(row[11]),
+                    )
+        finally:
+            con.close()
+
+    def _ensure_files_exist(self, rich: bool = False) -> None:
         required = ["tracks.parquet", "albums.parquet", "artists.parquet", "track_artists.parquet"]
+        if rich:
+            required.append("artist_genres.parquet")
         missing = [f for f in required if not (self.parquet_dir / f).exists()]
         if missing:
             raise FileNotFoundError(

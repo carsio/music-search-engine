@@ -13,7 +13,8 @@ Sistema de busca de músicas que implementa e compara diferentes técnicas de in
 ### Técnicas implementadas
 
 - **Indexação:** Índice invertido com suporte a diferentes esquemas de pesos
-- **Ranking:** TF-IDF, BM25
+- **Ranking esparso:** TF-IDF, BM25
+- **Ranking denso:** Embeddings + similaridade de cosseno em Milvus (opcional — ver abaixo)
 - **Avaliação:** Precision, Recall, MAP, nDCG
 - **Interface:** Aplicação web com FastAPI
 
@@ -95,6 +96,64 @@ recria `data/spotify-metadata` como symlink:
 ./scripts/download_spotify_metadata.sh --full /caminho/para/datasets/spotify-metadata
 ```
 
+## Busca vetorial (opcional)
+
+Modelo denso complementar ao BM25/TF-IDF: converte cada track em um embedding e
+recupera por similaridade de cosseno no [Milvus](https://milvus.io/). Útil para
+queries semânticas (`"música animada para treinar"`, `"rock clássico anos 70"`)
+onde os termos literais raramente aparecem no título da faixa.
+
+### Pré-requisitos
+
+Um dos dois backends de embedding:
+
+- **Ollama local** (padrão, sem custo): `ollama pull nomic-embed-text` e
+  `ollama serve` rodando.
+- **OpenAI API**: variável `OPENAI_API_KEY` (modelo `text-embedding-3-small`).
+
+### Instalação
+
+```bash
+# Dependências opcionais (pymilvus, openai, tqdm)
+uv sync --all-groups --extra vector
+```
+
+### Pipeline
+
+```bash
+# 1. Gera embeddings de cada track e popula o Milvus.
+#    Artefatos (Milvus Lite .db, checkpoint, log) vão para data/vector/.
+uv run python -m music_search.vector.indexing
+
+# Smoke test (limita número de tracks indexadas):
+INDEX_LIMIT=1000 uv run python -m music_search.vector.indexing
+
+# 2. Busca semântica via CLI:
+uv run python -m music_search.vector.search "rock clássico anos 70" --top 5
+
+# 3. Ou, como biblioteca:
+uv run python -c "from music_search.vector import search_tracks; \
+    print(search_tracks('música animada para treinar', top_k=5))"
+
+# 4. (Opcional) UI Tk para inspeção interativa — ferramenta de debug local:
+uv run python -m music_search.vector.ui_tk
+```
+
+### Variáveis de ambiente
+
+| Variável         | Padrão                            | Descrição                                        |
+|------------------|-----------------------------------|--------------------------------------------------|
+| `USE_OLLAMA`     | `true`                            | `false` para usar OpenAI                         |
+| `OLLAMA_URL`     | `http://localhost:11434/v1`       | Endpoint OpenAI-compatível do Ollama             |
+| `EMBED_MODEL`    | `nomic-embed-text`                | Modelo de embedding do Ollama                    |
+| `OPENAI_API_KEY` | —                                 | Chave da OpenAI (necessária se `USE_OLLAMA=false`) |
+| `MILVUS_URI`     | `./data/vector/milvus_spotify.db` | URI do Milvus (Lite local ou servidor remoto)    |
+| `INDEX_LIMIT`    | —                                 | Limita número de tracks (apenas na indexação)    |
+
+**Importante**: use o mesmo modelo para indexar e buscar. `nomic-embed-text`
+gera vetores de 768 dim; `text-embedding-3-small`, 1536 dim. Misturar os dois
+na mesma coleção quebra a busca.
+
 ## Estrutura do projeto
 
 ```
@@ -102,9 +161,16 @@ src/music_search/
 ├── __init__.py
 ├── preprocessing.py    # Tokenização, stemming, normalização
 ├── indexer.py          # Construção de índices invertidos
-├── ranking.py          # Modelos de ranking (TF-IDF, BM25)
+├── ranking.py          # Modelos de ranking esparsos (TF-IDF, BM25)
 ├── search.py           # Motor de busca / query processing
 ├── evaluation.py       # Métricas de avaliação de RI
+├── datasets.py         # ETL dos parquets do Spotify
+├── vector/             # Busca vetorial (opcional, extra `vector`)
+│   ├── __init__.py
+│   ├── config.py       # EmbeddingConfig + paths
+│   ├── indexing.py     # Pipeline de embeddings → Milvus
+│   ├── search.py       # Cliente de busca semântica + CLI
+│   └── ui_tk.py        # UI Tk de debug (opcional)
 └── web/
     ├── __init__.py
     └── app.py          # Interface web (FastAPI)
