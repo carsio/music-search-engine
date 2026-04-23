@@ -43,6 +43,9 @@ uv run uvicorn music_search.web.app:app --reload
 # Lint e formatação
 uv run ruff check .
 uv run ruff format .
+
+# Type checking
+uv run ty check
 ```
 
 ## Dados
