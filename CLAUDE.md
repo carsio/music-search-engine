@@ -30,7 +30,7 @@ uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwo
 # 5. Sanidade: lint, tipos e testes devem passar
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src/
+uv run ty check
 uv run pytest
 ```
 
@@ -55,7 +55,7 @@ uv run ruff check . --fix            # lint com autofix
 uv run ruff format .                 # formatação
 
 # Type checking
-uv run mypy src/
+uv run ty check
 
 # Servidor web (dev)
 uv run uvicorn music_search.web.app:app --reload
@@ -88,7 +88,7 @@ O pacote principal é `src/music_search/` (importado como `music_search`). O flu
 
 - Python 3.12+, gerenciado com `uv`
 - Ruff para lint e formatação (line-length=100, regras: E, W, F, I, UP, B, SIM, RUF)
-- mypy em modo strict
+- ty para checagem de tipos
 - Testes em `tests/` com pytest (flags: `-v --tb=short`)
 - Notebooks exploratórios em `notebooks/`
 - Todo código em português (docstrings, variáveis de domínio), APIs e nomes técnicos em inglês

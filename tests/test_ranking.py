@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import math
+from typing import cast
 
 import pytest
 
-from music_search.indexer import build_index
-from music_search.ranking import BM25, TFIDF, bm25_idf, tf_weight, tfidf_idf
+from music_search.indexer import InvertedIndex, build_index
+from music_search.ranking import BM25, TFIDF, TfScheme, bm25_idf, tf_weight, tfidf_idf
 
 
-def _make_index() -> object:
+def _make_index() -> InvertedIndex:
     docs = [
         {"id": "t1", "title": "As Canções de Amor", "artist": "Roberto Carlos", "album": "Emoções"},
         {"id": "t2", "title": "Amor de Carnaval", "artist": "Marisa Monte", "album": "Verdade"},
@@ -30,7 +31,7 @@ def test_bm25_idf_nunca_negativo_e_cresce_com_raridade() -> None:
 def test_bm25_rejeita_parametros_invalidos() -> None:
     idx = _make_index()
     with pytest.raises(KeyError):
-        BM25(idx, field="genre")  # type: ignore[arg-type]
+        BM25(idx, field="genre")
     with pytest.raises(ValueError):
         BM25(idx, field="title", k1=0.0)
     with pytest.raises(ValueError):
@@ -157,24 +158,25 @@ def test_tf_weight_variantes() -> None:
     assert tf_weight(3, "raw") == 3.0
     # log: 1 + ln(count), amortece.
     assert tf_weight(1, "log") == pytest.approx(1.0)
-    assert tf_weight(math.e, "log") == pytest.approx(2.0)  # 1 + ln(e)
+    assert tf_weight(3, "log") == pytest.approx(1.0 + math.log(3))
     # augmented: 0.5 + 0.5 * count/max_count.
     assert tf_weight(1, "augmented", max_count=2) == pytest.approx(0.75)
     assert tf_weight(2, "augmented", max_count=2) == pytest.approx(1.0)
     # count=0 zera em qualquer esquema.
-    for scheme in ("raw", "log", "augmented"):
-        assert tf_weight(0, scheme) == 0.0  # type: ignore[arg-type]
+    schemes: tuple[TfScheme, ...] = ("raw", "log", "augmented")
+    for scheme in schemes:
+        assert tf_weight(0, scheme) == 0.0
     # Esquema desconhecido → erro.
     with pytest.raises(ValueError):
-        tf_weight(1, "exotic")  # type: ignore[arg-type]
+        tf_weight(1, cast(TfScheme, "exotic"))
 
 
 def test_tfidf_rejeita_parametros_invalidos() -> None:
     idx = _make_index()
     with pytest.raises(KeyError):
-        TFIDF(idx, field="genre")  # type: ignore[arg-type]
+        TFIDF(idx, field="genre")
     with pytest.raises(ValueError):
-        TFIDF(idx, field="title", tf_scheme="quadratic")  # type: ignore[arg-type]
+        TFIDF(idx, field="title", tf_scheme=cast(TfScheme, "quadratic"))
 
 
 def test_tfidf_cosseno_em_intervalo_unitario() -> None:

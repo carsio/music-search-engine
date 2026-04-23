@@ -21,7 +21,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ruff>=0.11",
-    "mypy>=1.15",
+    "ty>=0.0.31",
     "pytest>=8.3",
     "pytest-cov>=6.1",
     "pre-commit>=4.2",
@@ -47,15 +47,12 @@ select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.ruff.lint.isort]
 known-first-party = ["music_search"]
 
-[tool.mypy]
-python_version = "3.12"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
+[tool.ty.environment]
+python-version = "3.12"
+root = ["./src"]
 
-[[tool.mypy.overrides]]
-module = "nltk.*"
-ignore_missing_imports = true
+[tool.ty.src]
+include = ["src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
