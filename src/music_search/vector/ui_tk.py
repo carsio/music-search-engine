@@ -1,37 +1,41 @@
-"""
-Interface gráfica para testar a busca semântica no Spotify (spotify_search.py).
+"""Interface Tkinter para a busca vetorial — ferramenta opcional de debug local.
+
+Não é a UI oficial do projeto (essa será a web FastAPI). Serve só para inspecionar
+os resultados da busca semântica interativamente sem precisar subir servidor.
 
 Uso:
-    python spotify_search_ui.py
+
+    uv run python -m music_search.vector.ui_tk
 """
+
+from __future__ import annotations
 
 import threading
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox, ttk
+from typing import Any, Literal
 
-from spotify_search import SpotifySearch
+from music_search.vector import VectorSearch
 
-# ── Constantes de layout ──────────────────────────────────────────────────────
-
-_WINDOW_TITLE  = "Spotify Search – Busca Semântica"
-_WINDOW_SIZE   = "1200x680"
+_WINDOW_TITLE = "Spotify Search — Busca Semântica"
+_WINDOW_SIZE = "1200x680"
 _DEFAULT_TOP_K = 20
 
-_COLUMNS = [
-    ("rank",             "#",            45,  "center"),
-    ("score",            "Score",        70,  "center"),
-    ("track_name",       "Música",       260, "w"),
-    ("artist_names",     "Artistas",     200, "w"),
-    ("album_name",       "Álbum",        200, "w"),
-    ("release_date",     "Lançamento",   90,  "center"),
-    ("artist_genres",    "Gêneros",      180, "w"),
-    ("track_popularity", "Pop.",         50,  "center"),
-    ("duration",         "Duração",      65,  "center"),
-    ("explicit",         "Exp.",         45,  "center"),
+_Anchor = Literal["nw", "n", "ne", "w", "center", "e", "sw", "s", "se"]
+
+_COLUMNS: list[tuple[str, str, int, _Anchor]] = [
+    ("rank", "#", 45, "center"),
+    ("score", "Score", 70, "center"),
+    ("track_name", "Música", 260, "w"),
+    ("artist_names", "Artistas", 200, "w"),
+    ("album_name", "Álbum", 200, "w"),
+    ("release_date", "Lançamento", 90, "center"),
+    ("artist_genres", "Gêneros", 180, "w"),
+    ("track_popularity", "Pop.", 50, "center"),
+    ("duration", "Duração", 65, "center"),
+    ("explicit", "Exp.", 45, "center"),
 ]
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _fmt_duration(ms: int) -> str:
     mins = ms // 60_000
@@ -39,7 +43,9 @@ def _fmt_duration(ms: int) -> str:
     return f"{mins}:{secs:02d}"
 
 
-def _row_values(r: dict) -> tuple:
+def _row_values(
+    r: dict[str, Any],
+) -> tuple[Any, str, str, str, str, str, str, Any, str, str]:
     return (
         r["rank"],
         f"{r['score']:.4f}",
@@ -54,8 +60,6 @@ def _row_values(r: dict) -> tuple:
     )
 
 
-# ── Janela principal ──────────────────────────────────────────────────────────
-
 class SpotifySearchApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -63,10 +67,9 @@ class SpotifySearchApp(tk.Tk):
         self.geometry(_WINDOW_SIZE)
         self.minsize(800, 500)
 
-        self._search_engine = SpotifySearch()
+        self._search_engine = VectorSearch()
+        self._results: list[dict[str, Any]] = []
         self._build_ui()
-
-    # ── Construção da UI ──────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
         self._build_search_bar()
@@ -101,9 +104,14 @@ class SpotifySearchApp(tk.Tk):
         self._tree = ttk.Treeview(frame, columns=cols, show="headings", selectmode="browse")
 
         for col_id, heading, width, anchor in _COLUMNS:
-            self._tree.heading(col_id, text=heading,
-                               command=lambda c=col_id: self._sort_column(c))
-            self._tree.column(col_id, width=width, minwidth=30, anchor=anchor, stretch=(col_id == "track_name"))
+            self._tree.heading(col_id, text=heading, command=lambda c=col_id: self._sort_column(c))
+            self._tree.column(
+                col_id,
+                width=width,
+                minwidth=30,
+                anchor=anchor,
+                stretch=(col_id == "track_name"),
+            )
 
         vsb = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=self._tree.yview)
         hsb = ttk.Scrollbar(frame, orient=tk.HORIZONTAL, command=self._tree.xview)
@@ -116,16 +124,19 @@ class SpotifySearchApp(tk.Tk):
         frame.columnconfigure(0, weight=1)
 
         self._tree.bind("<Double-1>", self._on_row_double_click)
-        self._tree.tag_configure("odd",  background="#f9f9f9")
+        self._tree.tag_configure("odd", background="#f9f9f9")
         self._tree.tag_configure("even", background="#ffffff")
 
     def _build_status_bar(self) -> None:
         self._status_var = tk.StringVar(value="Pronto.")
-        bar = ttk.Label(self, textvariable=self._status_var,
-                        relief=tk.SUNKEN, anchor=tk.W, padding=(8, 2))
+        bar = ttk.Label(
+            self,
+            textvariable=self._status_var,
+            relief=tk.SUNKEN,
+            anchor=tk.W,
+            padding=(8, 2),
+        )
         bar.pack(fill=tk.X, side=tk.BOTTOM)
-
-    # ── Lógica de busca ───────────────────────────────────────────────────────
 
     def _on_search(self) -> None:
         query = self._query_var.get().strip()
@@ -143,34 +154,28 @@ class SpotifySearchApp(tk.Tk):
 
     def _search_thread(self, query: str, top_k: int) -> None:
         try:
-            results = self._search_engine.buscar(query, top_k=top_k)
+            results = self._search_engine.search(query, top_k=top_k)
             self.after(0, self._populate_table, results, query)
         except Exception as exc:
             self.after(0, self._show_error, str(exc))
 
-    def _populate_table(self, results: list[dict], query: str) -> None:
+    def _populate_table(self, results: list[dict[str, Any]], query: str) -> None:
         self._clear_table()
         for i, r in enumerate(results):
             tag = "odd" if i % 2 else "even"
             self._tree.insert("", tk.END, iid=str(i), values=_row_values(r), tags=(tag,))
-            self._tree.item(str(i), tags=(tag,))
 
-        # guarda resultados completos para o double-click
         self._results = results
 
         count = len(results)
-        self._status_var.set(
-            f'{count} música{"s" if count != 1 else ""} encontrada{"s" if count != 1 else ""}'
-            f' para "{query}".'
-        )
+        s = "s" if count != 1 else ""
+        self._status_var.set(f'{count} música{s} encontrada{s} para "{query}".')
         self._set_searching(False)
 
     def _show_error(self, message: str) -> None:
         self._status_var.set(f"Erro: {message}")
         self._set_searching(False)
         messagebox.showerror("Erro na busca", message)
-
-    # ── Utilitários de UI ─────────────────────────────────────────────────────
 
     def _clear_table(self) -> None:
         self._tree.delete(*self._tree.get_children())
@@ -192,17 +197,16 @@ class SpotifySearchApp(tk.Tk):
             tag = "odd" if index % 2 else "even"
             self._tree.item(iid, tags=(tag,))
 
-    def _on_row_double_click(self, _event) -> None:
+    def _on_row_double_click(self, _event: object) -> None:
         sel = self._tree.selection()
         if not sel:
             return
         idx = int(sel[0])
         if idx >= len(self._results):
             return
-        r = self._results[idx]
-        self._show_detail(r)
+        self._show_detail(self._results[idx])
 
-    def _show_detail(self, r: dict) -> None:
+    def _show_detail(self, r: dict[str, Any]) -> None:
         win = tk.Toplevel(self)
         win.title(f"{r['track_name']} — detalhe")
         win.geometry("520x460")
@@ -240,8 +244,10 @@ class SpotifySearchApp(tk.Tk):
         text.configure(state=tk.DISABLED)
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
+def main() -> None:
     app = SpotifySearchApp()
     app.mainloop()
+
+
+if __name__ == "__main__":
+    main()

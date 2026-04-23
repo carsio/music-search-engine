@@ -18,6 +18,13 @@ dependencies = [
     "duckdb>=1.0",
 ]
 
+[project.optional-dependencies]
+vector = [
+    "pymilvus>=2.4",
+    "openai>=1.50",
+    "tqdm>=4.66",
+]
+
 [dependency-groups]
 dev = [
     "ruff>=0.11",

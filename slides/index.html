@@ -20,8 +20,11 @@
   "O processo de build é offline e incremental. O IndexBuilder recebe documentos um a um, acumula frequências e depois compacta tudo em listas ordenadas. O script build_index.py usa o SpotifyTracksLoader, aplica o builder e salva o resultado com pickle via InvertedIndex.save. Em desenvolvimento usamos --limit 10000 para um índice menor; em produção acadêmica o mesmo processo escala para o corpus inteiro e gera um artefato reutilizável sem alterar nenhuma outra parte do código.",
   "O BM25 é o primeiro modelo de relevância. Ele combina três sinais: frequência do termo no documento, raridade no corpus via IDF, e normalização pelo tamanho do documento com os hiperparâmetros k1 e b. A função rank monta o conjunto de candidatos direto das posting lists, o que reduz o custo computacional sem precisar varrer todos os documentos. O ponto importante é a saturação de TF: repetir um termo 20 vezes não vale 20 vezes mais — o BM25 aplica retorno decrescente.",
   "O segundo modelo é TF-IDF com similaridade de cosseno. Cada termo recebe peso TF vezes IDF, com variantes de TF — raw, log e augmented — implementadas em tf_weight. Documento e consulta viram vetores esparsos e a relevância é o cosseno entre eles. A implementação pré-calcula e memoiza as normas dos documentos com cached_property, evitando recomputar a cada consulta. Uma query idêntica ao documento ideal deve retornar cosseno próximo de 1.",
+  "BM25 e TF-IDF são modelos esparsos: eles ranqueiam pelo que a query tem em comum com o documento no nível lexical. Se a query for 'música animada para treinar' e o documento não contiver esses termos, o score é zero, mesmo que a faixa seja um house energético perfeito para academia. A busca vetorial resolve isso substituindo o vetor esparso de termos por um embedding denso: texto vira um vetor de 768 ou 1536 dimensões num espaço semântico e a relevância é a proximidade nesse espaço. Os dois modelos são complementares, não substitutos — esparso acerta termos raros e nomes próprios; denso acerta sinônimo, paráfrase e conceito.",
+  "O pipeline vetorial tem três blocos. Primeiro, o SpotifyTracksLoader emite um documento enriquecido por track com título, artistas, gêneros, álbum, label e popularidade — via iter_rich_docs, sem CSV intermediário. Em seguida, cada documento vira um texto compacto e é submetido a um modelo de embedding: por padrão o nomic-embed-text rodando local via Ollama, com 768 dimensões e sem custo; alternativamente o text-embedding-3-small da OpenAI, com 1536 dimensões. Finalmente, os vetores são armazenados no Milvus com índice IVF_FLAT e métrica de cosseno — a versão Lite é um arquivo local, sem precisar de Docker. O mesmo modelo precisa ser usado na indexação e na busca, senão as dimensões não batem.",
+  "Aqui um exemplo concreto de busca semântica. A query 'rock clássico dos anos 70 com guitarra' não contém o nome de nenhuma banda — nenhuma palavra da query aparece literalmente nos títulos das faixas retornadas. Mesmo assim, o modelo traz Led Zeppelin, Deep Purple, Pink Floyd e derivados, porque 'rock clássico anos 70 guitarra' está próximo, no espaço de embeddings, de descritores como hard rock, classic rock e progressive rock — que aparecem nos gêneros associados aos artistas. Esse é exatamente o tipo de consulta onde BM25 devolveria zero resultados e a busca vetorial agrega valor real.",
   "O projeto já tem uma base de testes significativa cobrindo preprocessing, indexer e ranking. Os testes não verificam só casos felizes: eles cobrem entradas inválidas, isolamento entre campos, ordenação estável, round-trip de serialização, comportamento matemático das fórmulas e equivalência entre query crua e pré-processada. Há um teste que compara o score do BM25 com a fórmula manual, e outro que verifica cosseno igual a 1 para documento idêntico à query. Isso transforma os testes em especificação executável do motor.",
-  "Para resumir: o motor lexical offline está completo. Temos corpus, pré-processamento, índice e dois modelos de ranking, tudo com testes e CI. O próximo bloco de trabalho é conectar o núcleo a query processing mais sofisticado, rodar avaliação experimental com métricas como MAP e NDCG, e construir uma interface de consulta. Não é refazer o núcleo — é expandir sobre uma base sólida. Fico à disposição para perguntas."
+  "Para resumir: o motor lexical offline está completo, e já temos também uma camada vetorial opcional como modelo denso complementar. Temos corpus, pré-processamento, índice, três modelos de ranking — BM25, TF-IDF e embeddings — tudo com testes e CI. O próximo bloco de trabalho é conectar o núcleo a query processing mais sofisticado, rodar avaliação experimental com métricas como MAP e NDCG comparando esparso versus denso, e construir a interface web de consulta. Não é refazer o núcleo — é expandir sobre uma base sólida. Fico à disposição para perguntas."
 ]
 </script>
 
@@ -843,7 +846,100 @@
   </section>
 
   <!-- ═══════════════════════════════════════════
-       11 TESTES
+       11 ESPARSO vs DENSO
+  ════════════════════════════════════════════ -->
+  <section data-label="Esparso vs Denso">
+    <div class="slide-inner">
+      <div class="slide-tag">Etapa 9</div>
+      <h2 class="slide-title">Recuperação Esparsa vs Densa</h2>
+      <div class="two-col" style="gap:48px;">
+        <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:28px 32px;">
+          <div style="font-size:26px; color:var(--amber); margin-bottom:12px; font-weight:600;">Esparso — BM25 / TF-IDF</div>
+          <div style="font-size:24px; color:var(--text); line-height:1.5;">
+            <p style="margin:0 0 12px;">Vetor é a contagem de termos.</p>
+            <p style="margin:0 0 12px;">Acerta <strong style="color:var(--amber);">nomes próprios</strong>, termos raros, match lexical.</p>
+            <p style="margin:0;">Falha com <strong>sinônimo</strong>, paráfrase e descrição conceitual.</p>
+          </div>
+        </div>
+        <div style="background:var(--purple-dim); border:1px solid var(--purple); border-radius:8px; padding:28px 32px;">
+          <div style="font-size:26px; color:var(--purple); margin-bottom:12px; font-weight:600;">Denso — Embeddings</div>
+          <div style="font-size:24px; color:var(--text); line-height:1.5;">
+            <p style="margin:0 0 12px;">Vetor é uma representação <strong>semântica</strong> aprendida.</p>
+            <p style="margin:0 0 12px;">Acerta <strong style="color:var(--purple);">conceito</strong>, sinônimo, tradução, descrição.</p>
+            <p style="margin:0;">Menos preciso em nomes próprios e termos OOV.</p>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:32px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:20px 28px;">
+        <div style="font-size:26px; color:var(--text);">Query <span class="f-var">"música animada para treinar"</span> → BM25 devolve <strong style="color:var(--amber);">zero</strong> (nenhum título tem esses termos). Denso traz house, EDM, trap de alta energia.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       12 EMBEDDINGS + MILVUS
+  ════════════════════════════════════════════ -->
+  <section data-label="Embeddings + Milvus">
+    <div class="slide-inner">
+      <div class="slide-tag">Etapa 10</div>
+      <h2 class="slide-title">Pipeline Vetorial — Embeddings + Milvus</h2>
+      <div class="two-col" style="gap:48px;">
+        <div class="formula-box">
+          <div class="f-label">1. Documento enriquecido</div>
+          <div class="f-line"><span class="f-var">SpotifyTracksLoader</span>.iter_rich_docs()</div>
+          <div class="f-line" style="padding-left:24px; font-size:22px; color:var(--muted);">title + artistas + gêneros + álbum + label</div>
+          <br>
+          <div class="f-label">2. Embedding de texto</div>
+          <div class="f-line"><span class="f-val">nomic-embed-text</span> <span style="color:var(--muted);">(Ollama, 768d)</span></div>
+          <div class="f-line"><span class="f-val">text-embedding-3-small</span> <span style="color:var(--muted);">(OpenAI, 1536d)</span></div>
+          <br>
+          <div class="f-label">3. Índice no Milvus</div>
+          <div class="f-line"><span class="f-var">IVF_FLAT</span> · métrica <span class="f-var">COSINE</span></div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:20px; justify-content:center;">
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:24px 28px;">
+            <div style="font-size:24px; color:var(--muted); margin-bottom:8px;">Extra opcional</div>
+            <div style="font-size:26px; color:var(--text);"><strong style="color:var(--text);">uv sync --extra vector</strong> — só quem quiser rodar a busca vetorial instala pymilvus e openai.</div>
+          </div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:24px 28px;">
+            <div style="font-size:24px; color:var(--muted); margin-bottom:8px;">Milvus Lite</div>
+            <div style="font-size:26px; color:var(--text);">Banco vetorial embutido — arquivo <strong>.db</strong> local, sem Docker, sem servidor.</div>
+          </div>
+          <div style="background:var(--purple-dim); border:1px solid var(--purple); border-radius:8px; padding:24px 28px;">
+            <div style="font-size:26px; color:var(--text);">Mesmo modelo na indexação e na busca — dimensões têm que bater.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       13 EXEMPLO DE BUSCA SEMÂNTICA
+  ════════════════════════════════════════════ -->
+  <section data-label="Busca Semântica">
+    <div class="slide-inner">
+      <div class="slide-tag">Etapa 10</div>
+      <h2 class="slide-title">Busca Semântica — Exemplo</h2>
+      <div class="formula-box" style="margin-bottom:24px;">
+        <div class="f-label">Query</div>
+        <div class="f-line"><span class="f-val">"rock clássico dos anos 70 com guitarra"</span></div>
+      </div>
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:20px 28px; font-family:var(--mono); font-size:22px; color:var(--text); line-height:1.6;">
+        <div style="color:var(--muted); font-size:20px; margin-bottom:8px;">$ python -m music_search.vector.search "rock clássico dos anos 70 com guitarra" --top 5</div>
+        <div>#01  <span style="color:var(--purple);">score=0.8721</span>  Stairway to Heaven — Led Zeppelin</div>
+        <div>#02  <span style="color:var(--purple);">score=0.8634</span>  Smoke on the Water — Deep Purple</div>
+        <div>#03  <span style="color:var(--purple);">score=0.8502</span>  Comfortably Numb — Pink Floyd</div>
+        <div>#04  <span style="color:var(--purple);">score=0.8411</span>  Hotel California — Eagles</div>
+        <div>#05  <span style="color:var(--purple);">score=0.8287</span>  Sweet Child O' Mine — Guns N' Roses</div>
+      </div>
+      <div style="margin-top:24px; background:var(--purple-dim); border:1px solid var(--purple); border-radius:8px; padding:20px 28px;">
+        <div style="font-size:26px; color:var(--text);">Nenhum termo da query aparece nos títulos. O match vem dos <strong style="color:var(--purple);">gêneros</strong> associados (classic rock, hard rock, progressive rock) e da <strong>semântica aprendida</strong> pelo modelo.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       14 TESTES
   ════════════════════════════════════════════ -->
   <section data-label="Testes" class="section-slide">
     <div class="section-num">09</div>
@@ -903,7 +999,8 @@
             <li><span class="sc-dot done"></span>Build + persistência do índice</li>
             <li><span class="sc-dot done"></span>Ranking BM25</li>
             <li><span class="sc-dot done"></span>Ranking TF-IDF + cosseno</li>
-            <li><span class="sc-dot done"></span>Suítes de teste (3 módulos)</li>
+            <li><span class="sc-dot done"></span>Busca vetorial (Milvus + embeddings)</li>
+            <li><span class="sc-dot done"></span>Suítes de teste</li>
           </ul>
         </div>
         <div class="status-card next">
