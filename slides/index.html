@@ -10,7 +10,7 @@
 
 <script type="application/json" id="speaker-notes">
 [
-  "Bom dia, professor. Hoje vou apresentar o estado atual do projeto de motor de busca musical, que é o tema central do meu mestrado. O sistema é totalmente offline e lexical, construído sobre metadados do Spotify. Vou percorrer as nove etapas que já foram implementadas e indicar o que ainda está por vir.",
+  "Bom dia, professor. Hoje vou apresentar o estado atual do projeto de motor de busca musical, desenvolvido para a disciplina de Recuperação da Informação da UFAM, ministrada pelo professor Edleno Silva de Moura. O sistema é totalmente offline e lexical, construído sobre metadados do Spotify. Vou percorrer as nove etapas que já foram implementadas e indicar o que ainda está por vir.",
   "A ideia central do projeto é transformar um corpus relacional de faixas do Spotify num motor de busca completo. Esse slide mostra o fluxo de ponta a ponta: partimos do dado bruto em parquet, passamos por um pipeline de pré-processamento, construímos um índice invertido offline e entregamos resultados ranqueados via BM25 ou TF-IDF. Cada bloco já tem implementação e testes automatizados.",
   "Antes de escrever uma linha de busca, eu precisava garantir que o projeto fosse reproduzível. A escolha foi usar pyproject.toml como ponto central: ele define a versão travada do Python, as dependências resolvidas com uv, o lint e formato com ruff, a checagem de tipos com ty e os testes com pytest. O CI roda tudo isso em push e pull request, então nenhuma mudança entra no repositório sem passar pelo gate automático. Esse passo foi essencial antes de qualquer trabalho em equipe.",
   "O corpus veio do Spotify via um script de download que suporta dois modos: truncado, para desenvolvimento rápido, e full, para o experimento final. O formato de saída é sempre o mesmo — parquet particionado em data/spotify-metadata — o que desacopla o resto do código do tamanho da base. A análise exploratória foi feita num notebook Jupyter e revelou a distribuição de artistas, idiomas e duração que guiou as decisões de pré-processamento.",
@@ -422,7 +422,7 @@
     <div class="grid-bg"></div>
     <div class="slide-inner" style="justify-content:center; gap:0; padding-top: 180px;">
       <div style="font-family:var(--mono); font-size:24px; color:var(--accent); letter-spacing:0.1em; margin-bottom:36px;">
-        MESTRADO &nbsp;·&nbsp; RELATÓRIO DE PROGRESSO &nbsp;·&nbsp; ABRIL 2026
+        ICC222 &nbsp;·&nbsp; RECUPERAÇÃO DA INFORMAÇÃO &nbsp;·&nbsp; PROF. EDLENO &nbsp;·&nbsp; UFAM
       </div>
       <h1 style="font-size:88px; font-weight:700; color:var(--text); line-height:1.05; margin-bottom:32px; max-width:1300px;">
         Motor de Busca Musical
@@ -430,6 +430,14 @@
       <p style="font-size:40px; color:var(--muted); font-weight:400; margin-bottom:72px;">
         Pipeline lexical offline sobre metadados do Spotify
       </p>
+      <div style="display:flex; flex-direction:column; gap:14px; margin-bottom:56px;">
+        <div style="font-size:28px; color:var(--text);">
+          Disciplina de Recuperação da Informação · UFAM
+        </div>
+        <div style="font-size:26px; color:var(--muted);">
+          Integrantes do grupo: Carsio Eddyo · Carlos Alexandre · Raquel de Sá · Lelson Nascimento
+        </div>
+      </div>
       <div style="display:flex; align-items:center; gap:20px;">
         <span style="font-family:var(--mono); font-size:26px; color:var(--accent-dim); background:var(--accent-dim); border:1px solid var(--accent); border-radius:6px; padding:10px 24px; color:var(--accent);">Python</span>
         <span style="font-family:var(--mono); font-size:26px; background:var(--amber-dim); border:1px solid var(--amber); border-radius:6px; padding:10px 24px; color:var(--amber);">BM25 + TF-IDF</span>
