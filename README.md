@@ -154,6 +154,93 @@ uv run python -m music_search.vector.ui_tk
 gera vetores de 768 dim; `text-embedding-3-small`, 1536 dim. Misturar os dois
 na mesma coleção quebra a busca.
 
+## Extração de letras (opcional)
+
+Pipeline para enriquecer cada faixa do dataset curado (`notebooks/04_dataset_curado_brasileiro.ipynb` → `data/derived/br_curated_tracks.parquet`) com a letra correspondente, usado depois pela indexação BM25/TF-IDF/vetorial.
+
+### Características
+
+- **Cascata de fontes**: tenta letras.mus.br → Vagalume (se houver chave) → lyrics.ovh → Genius (se houver token). Para na primeira que devolve uma letra.
+- **Cache SQLite persistente** (`data/derived/lyrics_cache.sqlite`): execução é **idempotente** — re-rodar não reprocessa faixas resolvidas.
+- **Async com httpx**: concorrência configurável (`--concurrency`), retries com backoff exponencial e jitter, semáforo global.
+- **Normalização de query**: remove `feat. X`, `(Ao Vivo)`, `- Remix`, `[Slowed]` etc. antes de bater na API.
+- **Status terminais separados**: `hit | miss | error | blocked`. `error` é re-tentável via `--retry-errors`.
+- **Anti-blocking** (ver `throttle.py` e `user_agents.py`):
+  - **Token bucket assíncrono** por fonte (letras.mus.br 1 rps, lyrics.ovh 5 rps, Vagalume 2 rps, Genius 1 rps).
+  - **Honor `Retry-After`**: na resposta 429/503 o limiter é penalizado pelo período pedido pelo servidor.
+  - **Circuit breaker**: após N falhas consecutivas (3 para scrapers HTML, 5 para APIs), a fonte é desligada por 60–120s e o pipeline cascateia para a próxima.
+  - **Pool de User-Agents** rotacionado para scraping de HTML (letras.mus.br/Genius), com headers realistas (`Accept`, `Accept-Language`, `Sec-Fetch-*`).
+  - `BLOCKED` agora significa "fonte exausta — pula"; só `ERROR` (transitório) é retentado.
+
+### Instalação
+
+```bash
+uv sync --all-groups --extra lyrics
+```
+
+### Variáveis de ambiente
+
+| Variável           | Necessária?                               | Como obter                                           |
+|--------------------|-------------------------------------------|------------------------------------------------------|
+| `VAGALUME_API_KEY` | Opcional (fallback via API, quando disponível) | Cadastro gratuito em https://auth.vagalume.com.br/   |
+| `GENIUS_TOKEN`     | Opcional (fallback de cauda longa)        | Cadastro gratuito em https://genius.com/api-clients  |
+
+`letras.mus.br` e `lyrics.ovh` são livres, sem cadastro, e ficam ligados por padrão.
+
+### Comandos
+
+```bash
+# Sanity check em uma faixa avulsa (testa todas as fontes configuradas)
+uv run python -m music_search.lyrics probe "Anitta" "Envolver"
+
+# Baixa letras (limite opcional para teste)
+uv run python -m music_search.lyrics fetch --limit 100 --concurrency 8
+
+# Interface Tk para baixar batches manualmente
+uv run python -m music_search.lyrics.ui_tk
+
+# Run completo (22k faixas)
+uv run python -m music_search.lyrics fetch
+
+# Status do cache
+uv run python -m music_search.lyrics stats
+
+# Onde as letras ficam salvas e como abrir no SQLite
+uv run python -m music_search.lyrics where
+
+# Ver amostras recentes ou aleatórias do cache
+uv run python -m music_search.lyrics sample -n 10 --status hit
+uv run python -m music_search.lyrics sample -n 10 --random
+
+# Mostrar a letra completa de uma faixa pelo track_id
+uv run python -m music_search.lyrics show <track_id>
+
+# Reprocessar só as faixas que terminaram em erro
+uv run python -m music_search.lyrics fetch --retry-errors
+
+# Exportar hits para parquet (pronto para indexação)
+uv run python -m music_search.lyrics export
+```
+
+### Estrutura do módulo
+
+```
+src/music_search/lyrics/
+├── cli.py                # subcomandos: fetch, stats, export, probe
+├── ui_tk.py              # interface Tk para baixar batches manualmente
+├── pipeline.py           # orquestrador async + cache + retries
+├── cache.py              # SQLite com WAL e upsert idempotente
+├── normalize.py          # limpeza de título/artista
+├── throttle.py           # token bucket + circuit breaker + Retry-After
+├── user_agents.py        # pool de UAs realistas para HTML scraping
+└── sources/
+    ├── base.py           # protocolo LyricsSource + Status
+    ├── letras_mus_br.py  # scraping HTML do letras.mus.br (sem chave)
+    ├── lyrics_ovh.py     # API pública gratuita
+    ├── vagalume.py       # API com chave gratuita (foco BR)
+    └── genius.py         # API + scraping de HTML (com UA pool)
+```
+
 ## Estrutura do projeto
 
 ```
