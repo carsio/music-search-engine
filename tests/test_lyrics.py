@@ -92,3 +92,104 @@ def test_genius_parse_lyrics_from_data_containers() -> None:
     """
 
     assert GeniusSource._parse_lyrics(html) == "Verso A\nVerso B\nRefrão"
+
+
+def test_genius_extract_hits_handles_api_and_public_payloads() -> None:
+    from music_search.lyrics.sources.genius import GeniusSource
+
+    api_payload = {
+        "response": {
+            "hits": [
+                {"type": "song", "result": {"url": "u1", "title": "t1"}},
+                {"type": "lyric", "result": {"url": "u2"}},
+            ]
+        }
+    }
+    public_payload = {
+        "response": {
+            "sections": [
+                {"type": "top_hit", "hits": [{"type": "song", "result": {"url": "u3"}}]},
+                {
+                    "type": "song",
+                    "hits": [
+                        {"type": "song", "result": {"url": "u4"}},
+                        {"type": "album", "result": {"url": "ignored"}},
+                    ],
+                },
+            ]
+        }
+    }
+
+    api_hits = GeniusSource._extract_hits(api_payload)
+    pub_hits = GeniusSource._extract_hits(public_payload)
+    assert [h["result"]["url"] for h in api_hits] == ["u1"]
+    assert [h["result"]["url"] for h in pub_hits] == ["u4"]
+
+
+def test_lrclib_strip_timestamps_keeps_only_text() -> None:
+    from music_search.lyrics.sources.lrclib import LrcLibSource
+
+    synced = (
+        "[00:12.34]Linha um\n[00:15.00]Linha dois\n[01:02.5]Linha tres\n  \nLinha sem timestamp\n"
+    )
+    assert LrcLibSource._strip_timestamps(synced) == (
+        "Linha um\nLinha dois\nLinha tres\nLinha sem timestamp"
+    )
+
+
+def test_lrclib_extract_lyrics_prefers_plain_falls_back_to_synced() -> None:
+    from music_search.lyrics.sources.lrclib import LrcLibSource
+
+    plain_only = {"plainLyrics": "verso 1\nverso 2", "syncedLyrics": ""}
+    synced_only = {"plainLyrics": "", "syncedLyrics": "[00:01.00]oi"}
+    instrumental = {"instrumental": True, "plainLyrics": "ignorar"}
+    empty = {"plainLyrics": "", "syncedLyrics": ""}
+
+    assert LrcLibSource._extract_lyrics(plain_only) == "verso 1\nverso 2"
+    assert LrcLibSource._extract_lyrics(synced_only) == "oi"
+    assert LrcLibSource._extract_lyrics(instrumental) is None
+    assert LrcLibSource._extract_lyrics(empty) is None
+
+
+def test_lyrics_cache_retry_misses(tmp_path: Path) -> None:
+    cache = LyricsCache(tmp_path / "lyrics.sqlite")
+    cache.upsert(
+        track_id="trk-miss",
+        isrc=None,
+        artist="A",
+        title="B",
+        status="miss",
+    )
+    cache.upsert(
+        track_id="trk-blocked",
+        isrc=None,
+        artist="A",
+        title="C",
+        status="blocked",
+    )
+    cache.upsert(
+        track_id="trk-hit",
+        isrc=None,
+        artist="A",
+        title="D",
+        status="hit",
+        lyrics="...",
+    )
+
+    # default: tudo resolvido
+    assert cache.has_resolved("trk-miss")
+    assert cache.has_resolved("trk-blocked")
+    assert cache.has_resolved("trk-hit")
+
+    # retry_misses libera apenas miss
+    assert not cache.has_resolved("trk-miss", retry_misses=True)
+    assert cache.has_resolved("trk-blocked", retry_misses=True)
+    assert cache.has_resolved("trk-hit", retry_misses=True)
+
+    # retry_blocked libera apenas blocked
+    assert cache.has_resolved("trk-miss", retry_blocked=True)
+    assert not cache.has_resolved("trk-blocked", retry_blocked=True)
+
+    # hit nunca e retentado
+    assert cache.has_resolved("trk-hit", retry_errors=True, retry_misses=True, retry_blocked=True)
+    cache.close()

@@ -115,9 +115,7 @@ class LetrasMusBrSource:
             )
         except httpx.HTTPError as exc:
             self.circuit_breaker.record_failure()
-            return LyricsResult(
-                Status.ERROR, error=repr(exc), source=self.name, source_url=url
-            )
+            return LyricsResult(Status.ERROR, error=repr(exc), source=self.name, source_url=url)
 
         if page.status_code == 429:
             wait = parse_retry_after(page.headers.get("Retry-After"), default=30.0)

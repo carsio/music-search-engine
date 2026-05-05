@@ -22,6 +22,7 @@ from music_search.lyrics.pipeline import PipelineConfig, run_pipeline
 from music_search.lyrics.sources import (
     GeniusSource,
     LetrasMusBrSource,
+    LrcLibSource,
     LyricsOvhSource,
     LyricsSource,
     VagalumeSource,
@@ -33,14 +34,19 @@ DEFAULT_EXPORT = Path("data/derived/lyrics.parquet")
 
 
 def _build_sources(client: httpx.AsyncClient) -> list[LyricsSource]:
-    """Cascata de fontes. Ordem otimizada para catalogo brasileiro:
+    """Cascata de fontes. Ordem otimizada para catalogo brasileiro + recuperacao
+    de misses internacionais:
 
     1. letras.mus.br (scraping HTML, melhor cobertura BR, sem chave).
-    2. vagalume (API JSON, opt-in via VAGALUME_API_KEY — instavel atualmente).
-    3. lyrics.ovh (publico, fallback internacional).
-    4. genius (API + scraping HTML, opt-in via GENIUS_TOKEN — cauda longa).
+    2. lrclib (API JSON publica, sem chave, ~3M tracks — cobre internacional/pop).
+    3. vagalume (API JSON, opt-in via VAGALUME_API_KEY — instavel atualmente).
+    4. lyrics.ovh (publico, fallback simples).
+    5. genius (API com GENIUS_TOKEN; sem token usa endpoint publico de busca).
     """
-    sources: list[LyricsSource] = [LetrasMusBrSource(client)]
+    sources: list[LyricsSource] = [
+        LetrasMusBrSource(client),
+        LrcLibSource(client),
+    ]
 
     vagalume_key = os.environ.get("VAGALUME_API_KEY", "").strip()
     if vagalume_key:
@@ -48,9 +54,10 @@ def _build_sources(client: httpx.AsyncClient) -> list[LyricsSource]:
 
     sources.append(LyricsOvhSource(client))
 
-    genius_token = os.environ.get("GENIUS_TOKEN", "").strip()
-    if genius_token:
-        sources.append(GeniusSource(client, token=genius_token))
+    # Genius funciona com ou sem token. Com token = mais quota e estabilidade;
+    # sem token = endpoint publico do site (cota menor, sujeito a Cloudflare).
+    genius_token = os.environ.get("GENIUS_TOKEN", "").strip() or None
+    sources.append(GeniusSource(client, token=genius_token))
 
     return sources
 
@@ -63,6 +70,8 @@ def cmd_fetch(args: argparse.Namespace) -> None:
         request_timeout=args.timeout,
         max_retries=args.max_retries,
         retry_errors=args.retry_errors,
+        retry_misses=args.retry_misses,
+        retry_blocked=args.retry_blocked,
         limit=args.limit,
     )
     asyncio.run(run_pipeline(cfg, _build_sources))
@@ -207,6 +216,17 @@ def main() -> None:
         "--retry-errors",
         action="store_true",
         help="Reprocessa faixas que terminaram com status=error",
+    )
+    p_fetch.add_argument(
+        "--retry-misses",
+        action="store_true",
+        help="Reprocessa faixas que terminaram com status=miss "
+        "(util ao adicionar novas fontes ao cascade)",
+    )
+    p_fetch.add_argument(
+        "--retry-blocked",
+        action="store_true",
+        help="Reprocessa faixas que terminaram com status=blocked",
     )
     p_fetch.add_argument("--limit", type=int, default=None)
     p_fetch.set_defaults(func=cmd_fetch)

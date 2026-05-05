@@ -114,19 +114,29 @@ class LyricsApp(tk.Tk):
         ).grid(row=0, column=3, padx=(6, 16))
 
         self._retry_errors_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
-            frame, text="Re-tentar erros anteriores", variable=self._retry_errors_var
-        ).grid(row=0, column=4, padx=(0, 16))
+        ttk.Checkbutton(frame, text="Re-tentar erros", variable=self._retry_errors_var).grid(
+            row=0, column=4, padx=(0, 8)
+        )
+
+        self._retry_misses_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(frame, text="Re-tentar misses", variable=self._retry_misses_var).grid(
+            row=0, column=5, padx=(0, 8)
+        )
+
+        self._retry_blocked_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(frame, text="Re-tentar blocked", variable=self._retry_blocked_var).grid(
+            row=0, column=6, padx=(0, 16)
+        )
 
         self._start_btn = ttk.Button(frame, text="▶ Iniciar", command=self._start_batch)
-        self._start_btn.grid(row=0, column=5, padx=(0, 4))
+        self._start_btn.grid(row=0, column=7, padx=(0, 4))
 
         self._stop_btn = ttk.Button(
             frame, text="■ Parar", command=self._stop_batch, state="disabled"
         )
-        self._stop_btn.grid(row=0, column=6)
+        self._stop_btn.grid(row=0, column=8)
 
-        frame.columnconfigure(7, weight=1)
+        frame.columnconfigure(9, weight=1)
 
     def _build_progress(self) -> None:
         frame = ttk.Frame(self, padding=(12, 0, 12, 8))
@@ -201,6 +211,8 @@ class LyricsApp(tk.Tk):
         limit = max(1, int(self._limit_var.get()))
         concurrency = max(1, int(self._concurrency_var.get()))
         retry_errors = bool(self._retry_errors_var.get())
+        retry_misses = bool(self._retry_misses_var.get())
+        retry_blocked = bool(self._retry_blocked_var.get())
 
         self._stop_flag.clear()
         self._start_btn.configure(state="disabled")
@@ -209,12 +221,13 @@ class LyricsApp(tk.Tk):
         self._progress_label.configure(text="iniciando…")
         self._log_line(
             f"▶ Batch iniciado: limite={limit}, concurrency={concurrency}, "
-            f"retry_errors={retry_errors}"
+            f"retry_errors={retry_errors}, retry_misses={retry_misses}, "
+            f"retry_blocked={retry_blocked}"
         )
 
         self._worker_thread = threading.Thread(
             target=self._worker_main,
-            args=(limit, concurrency, retry_errors),
+            args=(limit, concurrency, retry_errors, retry_misses, retry_blocked),
             daemon=True,
         )
         self._worker_thread.start()
@@ -254,21 +267,42 @@ class LyricsApp(tk.Tk):
 
     # ----------------------------------------------------- worker / refresh
 
-    def _worker_main(self, limit: int, concurrency: int, retry_errors: bool) -> None:
+    def _worker_main(
+        self,
+        limit: int,
+        concurrency: int,
+        retry_errors: bool,
+        retry_misses: bool,
+        retry_blocked: bool,
+    ) -> None:
         try:
-            asyncio.run(self._run_async(limit, concurrency, retry_errors))
+            asyncio.run(
+                self._run_async(limit, concurrency, retry_errors, retry_misses, retry_blocked)
+            )
         except Exception as exc:  # pragma: no cover
             self._event_queue.put(("log", f"erro no worker: {exc!r}"))
         finally:
             self._event_queue.put(("done", None))
 
-    async def _run_async(self, limit: int, concurrency: int, retry_errors: bool) -> None:
+    async def _run_async(
+        self,
+        limit: int,
+        concurrency: int,
+        retry_errors: bool,
+        retry_misses: bool,
+        retry_blocked: bool,
+    ) -> None:
         cache = LyricsCache(self._cache_path)
         rows = read_tracks(self._parquet_path, limit=None)
         pending = [
             r
             for r in rows
-            if not cache.has_resolved(r["track_id"], retry_errors=retry_errors)
+            if not cache.has_resolved(
+                r["track_id"],
+                retry_errors=retry_errors,
+                retry_misses=retry_misses,
+                retry_blocked=retry_blocked,
+            )
         ][:limit]
 
         if not pending:
@@ -276,9 +310,7 @@ class LyricsApp(tk.Tk):
             cache.close()
             return
 
-        self._event_queue.put(
-            ("progress", {"done": 0, "total": len(pending), "label": "rodando…"})
-        )
+        self._event_queue.put(("progress", {"done": 0, "total": len(pending), "label": "rodando…"}))
 
         timeout = httpx.Timeout(20.0, connect=10.0)
         limits = httpx.Limits(
@@ -293,9 +325,7 @@ class LyricsApp(tk.Tk):
             timeout=timeout, limits=limits, headers=headers, follow_redirects=True
         ) as client:
             sources: list[LyricsSource] = list(_build_sources(client))
-            self._event_queue.put(
-                ("log", "Fontes: " + " → ".join(s.name for s in sources))
-            )
+            self._event_queue.put(("log", "Fontes: " + " → ".join(s.name for s in sources)))
             sem = asyncio.Semaphore(concurrency)
 
             done_count = {"n": 0}
@@ -338,9 +368,7 @@ class LyricsApp(tk.Tk):
                                     source_url=result.source_url,
                                     lyrics=result.lyrics,
                                 )
-                            self._after_track(
-                                done_count, len(pending), track, "hit", result.source
-                            )
+                            self._after_track(done_count, len(pending), track, "hit", result.source)
                             return
                         if result.status == Status.ERROR:
                             # 1 retry simples

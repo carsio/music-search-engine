@@ -33,6 +33,8 @@ class PipelineConfig:
     retry_backoff: float = 2.0
     retry_jitter: float = 0.4
     retry_errors: bool = False
+    retry_misses: bool = False
+    retry_blocked: bool = False
     limit: int | None = None
     user_agent: str = (
         "music-search-engine-lyrics/0.1 "
@@ -145,10 +147,22 @@ def read_tracks(parquet_path: Path, limit: int | None) -> list[dict]:
     return rows
 
 
-def _filter_pending(rows: Iterable[dict], cache: LyricsCache, retry_errors: bool) -> list[dict]:
+def _filter_pending(
+    rows: Iterable[dict],
+    cache: LyricsCache,
+    *,
+    retry_errors: bool,
+    retry_misses: bool = False,
+    retry_blocked: bool = False,
+) -> list[dict]:
     pending: list[dict] = []
     for row in rows:
-        if not cache.has_resolved(row["track_id"], retry_errors=retry_errors):
+        if not cache.has_resolved(
+            row["track_id"],
+            retry_errors=retry_errors,
+            retry_misses=retry_misses,
+            retry_blocked=retry_blocked,
+        ):
             pending.append(row)
     return pending
 
@@ -156,7 +170,13 @@ def _filter_pending(rows: Iterable[dict], cache: LyricsCache, retry_errors: bool
 async def run_pipeline(cfg: PipelineConfig, sources_factory: SourcesFactory) -> dict[str, int]:
     cache = LyricsCache(cfg.cache_path)
     rows = read_tracks(cfg.parquet_path, cfg.limit)
-    pending = _filter_pending(rows, cache, retry_errors=cfg.retry_errors)
+    pending = _filter_pending(
+        rows,
+        cache,
+        retry_errors=cfg.retry_errors,
+        retry_misses=cfg.retry_misses,
+        retry_blocked=cfg.retry_blocked,
+    )
     total = len(rows)
 
     if not pending:

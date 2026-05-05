@@ -41,16 +41,35 @@ class LyricsCache:
         self.conn.execute("PRAGMA synchronous=NORMAL")
         self.conn.commit()
 
-    def has_resolved(self, track_id: str, *, retry_errors: bool = False) -> bool:
-        """Retorna True se a faixa ja foi processada com status terminal."""
+    def has_resolved(
+        self,
+        track_id: str,
+        *,
+        retry_errors: bool = False,
+        retry_misses: bool = False,
+        retry_blocked: bool = False,
+    ) -> bool:
+        """Retorna True se a faixa ja foi processada com status terminal.
+
+        Os flags `retry_*` permitem forcar reprocessamento por status:
+        - retry_errors:  re-tenta linhas com status='error'.
+        - retry_misses:  re-tenta linhas com status='miss' (util quando se
+          adicionam novas fontes ao cascade — os 'miss' antigos podem virar 'hit').
+        - retry_blocked: re-tenta linhas com status='blocked'.
+        """
         row = self.conn.execute(
             "SELECT status FROM lyrics WHERE track_id = ?", (track_id,)
         ).fetchone()
         if row is None:
             return False
-        if retry_errors and row["status"] == "error":
+        status = row["status"]
+        if retry_errors and status == "error":
             return False
-        return row["status"] in _TERMINAL or row["status"] == "error"
+        if retry_misses and status == "miss":
+            return False
+        if retry_blocked and status == "blocked":
+            return False
+        return status in _TERMINAL or status == "error"
 
     def upsert(
         self,
