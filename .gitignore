@@ -12,6 +12,9 @@ wheels/
 # Data directory is versioned; local dataset contents and symlinks are not
 data/*
 !data/.gitkeep
+!data/derived/
+data/derived/*
+!data/derived/br_curated_lyrics.parquet
 
 # IDE
 .idea/

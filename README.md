@@ -10,24 +10,48 @@ Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFA
 
 Sistema de busca de músicas que implementa e compara diferentes técnicas de indexação e ranking textual, utilizando o dataset [Spotify Metadata](https://www.kaggle.com/datasets/lordpatil/spotify-metadata-by-annas-archive) como base de dados.
 
+Para o experimento esparso principal do projeto, o repositório agora inclui um corpus curado e menor de músicas brasileiras com letra em [data/derived/br_curated_lyrics.parquet](data/derived/br_curated_lyrics.parquet). Esse corpus consolidado é o dataset usado por padrão em BM25/TF-IDF, na CLI de busca e na GUI Tkinter.
+
 ### Técnicas implementadas
 
 - **Indexação:** Índice invertido com suporte a diferentes esquemas de pesos
 - **Ranking esparso:** TF-IDF, BM25
 - **Ranking denso:** Embeddings + similaridade de cosseno em Milvus (opcional — ver abaixo)
 - **Avaliação:** Precision, Recall, MAP, nDCG
-- **Interface:** Aplicação web com FastAPI
+- **Interface esparsa:** GUI Tkinter comparando BM25 x TF-IDF lado a lado
+- **Interface web:** FastAPI ainda experimental / opcional
 
 ## Setup
 
 Requer [uv](https://docs.astral.sh/uv/) e Python 3.12+.
 
+### Setup rápido: BM25/TF-IDF no corpus curado
+
 ```bash
 # Instalar dependências
-uv sync
+uv sync --all-groups
 
 # Baixar dados do NLTK (primeira vez)
-uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords')"
+uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('rslp')"
+
+# Construir o índice padrão do corpus curado
+uv run python scripts/build_index.py
+
+# Smoke test em linha de comando
+uv run python -m music_search.search "amor saudade" --algorithm both --top 5
+
+# Abrir a GUI Tkinter para comparar BM25 e TF-IDF
+uv run python -m music_search.ui_tk
+```
+
+### Setup completo: dataset bruto, notebooks e busca vetorial
+
+```bash
+# Instalar dependências
+uv sync --all-groups
+
+# Baixar dados do NLTK (primeira vez)
+uv run python -c "import nltk; nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('rslp')"
 
 # Baixar o dataset truncado (padrão, ~344 MB)
 ./scripts/download_spotify_metadata.sh --truncated
@@ -51,9 +75,28 @@ uv run ty check
 
 ## Dados
 
+### Corpus curado versionado
+
+O experimento esparso usa por padrão o arquivo [data/derived/br_curated_lyrics.parquet](data/derived/br_curated_lyrics.parquet), que já vai no repositório:
+
+- **14.044 músicas brasileiras com letra**
+- **6 campos indexados**: `track_name`, `artist_names`, `artist_genres`, `macro_genre`, `album_name`, `lyrics`
+- **uso principal**: comparação de BM25 e TF-IDF na CLI e na GUI Tkinter
+
+Se você atualizar a curadoria ou o cache de letras, gere novamente esse corpus com:
+
+```bash
+uv run python scripts/build_curated_corpus.py
+uv run python scripts/build_index.py
+```
+
+O `build_index.py` agora usa esse corpus por padrão. Para indexar o Spotify bruto, use `--dataset spotify`.
+
+### Dataset bruto (não versionado)
+
 Código e notebooks **assumem** que `data/spotify-metadata/` já está populado com os parquets do
 dataset — nenhum download implícito. O diretório `data/` em si é versionado, mas o conteúdo
-(`data/*`) fica fora do git.
+(`data/*`) fica fora do git, com exceção do corpus curado consolidado acima.
 
 Há dois modos de bootstrap, com o mesmo layout final:
 
@@ -72,6 +115,28 @@ Há dois modos de bootstrap, com o mesmo layout final:
 Troca entre os modos é transparente: o layout final é sempre
 `data/spotify-metadata/spotify_clean_parquet/*.parquet` + audio features. Notebooks e código
 de indexação não mudam.
+
+## Busca esparsa no corpus curado
+
+O módulo [src/music_search/search.py](src/music_search/search.py) monta um índice invertido multi-campo e reaproveita os rankers de [src/music_search/ranking.py](src/music_search/ranking.py) para executar BM25 e TF-IDF sem duplicar a lógica de scoring.
+
+O score final é uma agregação com pesos por campo, dando mais importância à `lyrics`, seguida de `track_name` e `artist_genres`. Na GUI você pode ligar e desligar campos para testar cenários diferentes.
+
+### Comandos principais
+
+```bash
+# Regenerar o corpus curado consolidado
+uv run python scripts/build_curated_corpus.py
+
+# Regerar o índice padrão do corpus curado
+uv run python scripts/build_index.py
+
+# Buscar pela CLI
+uv run python -m music_search.search "sertanejo romântico saudade" --algorithm both --top 10
+
+# Buscar pela GUI
+uv run python -m music_search.ui_tk
+```
 
 ### Pré-requisitos por modo
 
@@ -220,6 +285,9 @@ uv run python -m music_search.lyrics fetch --retry-errors
 
 # Exportar hits para parquet (pronto para indexação)
 uv run python -m music_search.lyrics export
+
+# Consolidar tracks curadas + letras em um único parquet versionável
+uv run python scripts/build_curated_corpus.py
 ```
 
 ### Estrutura do módulo
@@ -249,9 +317,10 @@ src/music_search/
 ├── preprocessing.py    # Tokenização, stemming, normalização
 ├── indexer.py          # Construção de índices invertidos
 ├── ranking.py          # Modelos de ranking esparsos (TF-IDF, BM25)
-├── search.py           # Motor de busca / query processing
+├── search.py           # Motor de busca esparsa no corpus curado
+├── ui_tk.py            # GUI Tkinter para comparar BM25 x TF-IDF
 ├── evaluation.py       # Métricas de avaliação de RI
-├── datasets.py         # ETL dos parquets do Spotify
+├── datasets.py         # Loaders do Spotify e do corpus curado consolidado
 ├── vector/             # Busca vetorial (opcional, extra `vector`)
 │   ├── __init__.py
 │   ├── config.py       # EmbeddingConfig + paths
@@ -260,7 +329,7 @@ src/music_search/
 │   └── ui_tk.py        # UI Tk de debug (opcional)
 └── web/
     ├── __init__.py
-    └── app.py          # Interface web (FastAPI)
+    └── app.py          # Interface web experimental (FastAPI)
 ```
 
 ## Equipe
