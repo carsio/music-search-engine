@@ -73,6 +73,54 @@ uv run ruff format .
 uv run ty check
 ```
 
+### Atalho via Makefile
+
+Se voce quiser uma rotina mais rapida numa nova sessao, o repositorio agora tem um `Makefile`
+na raiz. Ele nao substitui os comandos explicitos do README; so encapsula os mesmos fluxos com
+atalhos curtos.
+
+```bash
+# Ver os targets disponiveis
+make
+# ou
+make help
+
+# Nova sessao: fluxo principal
+make setup
+make nltk
+make index
+make search SEARCH_QUERY="amor saudade" SEARCH_TOP=5
+
+# Qualidade de codigo
+make check
+
+# Servicos/interfaces
+make ui
+make web
+
+# Dataset bruto
+make download
+make download-full
+
+# Opcional: instalar tudo de uma vez
+make setup-all
+
+# Opcional: busca vetorial
+make setup-vector
+make vector-index
+make vector-search VECTOR_QUERY="rock classico anos 70" VECTOR_TOP=5
+
+# Opcional: pipeline de letras
+make setup-lyrics
+make lyrics-probe LYRICS_ARTIST="Anitta" LYRICS_TITLE="Envolver"
+make lyrics-fetch LYRICS_FETCH_ARGS="--limit 100 --concurrency 8"
+make lyrics-stats
+```
+
+Quando um argumento tiver espacos, passe-o entre aspas. Os targets interativos ou de longa
+duracao (`ui`, `web`, `vector-ui`, `lyrics-ui`) seguem o mesmo comportamento dos comandos `uv`
+equivalentes.
+
 ## Dados
 
 ### Corpus curado versionado
