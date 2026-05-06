@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import random
+import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,7 +16,7 @@ import pyarrow.parquet as pq
 from tqdm.asyncio import tqdm as atqdm
 
 from music_search.lyrics.cache import LyricsCache
-from music_search.lyrics.normalize import normalize_artist, normalize_title
+from music_search.lyrics.normalize import normalize_artist, normalize_title, title_variants
 from music_search.lyrics.sources.base import LyricsResult, LyricsSource, Status
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,8 @@ class PipelineConfig:
     retry_errors: bool = False
     retry_misses: bool = False
     retry_blocked: bool = False
+    title_variants_on_miss: bool = True
+    max_title_variants: int = 6
     limit: int | None = None
     user_agent: str = (
         "music-search-engine-lyrics/0.1 "
@@ -75,6 +79,16 @@ async def _retry_fetch(
     return last, attempts
 
 
+def _serialize_trace(trace: list[dict]) -> str | None:
+    """Serializa o trace como JSON compacto (string vazia vira None)."""
+    if not trace:
+        return None
+    try:
+        return json.dumps(trace, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return None
+
+
 async def _process_track(
     track: dict,
     sources: Sequence[LyricsSource],
@@ -85,11 +99,28 @@ async def _process_track(
 ) -> str:
     async with semaphore:
         artist = normalize_artist(track.get("primary_artist_name") or "")
-        title = normalize_title(track.get("track_name") or "")
+        raw_title = track.get("track_name") or ""
+        title = normalize_title(raw_title)
         track_id = track["track_id"]
         isrc = track.get("isrc")
 
+        # Trace estruturado: lista de tentativas (uma por (fonte, variante)),
+        # serializada como JSON na coluna `trace` do cache. Usado pela UI para
+        # mostrar como cada faixa foi pesquisada.
+        trace: list[dict] = []
+
         if not artist or not title:
+            trace.append(
+                {
+                    "ts": int(time.time()),
+                    "source": None,
+                    "query_artist": artist,
+                    "query_title": title,
+                    "raw_title": raw_title,
+                    "status": Status.MISS.value,
+                    "error": "empty artist or title",
+                }
+            )
             async with cache_lock:
                 cache.upsert(
                     track_id=track_id,
@@ -98,15 +129,51 @@ async def _process_track(
                     title=title,
                     status=Status.MISS.value,
                     error="empty artist or title",
+                    trace=_serialize_trace(trace),
                 )
             return Status.MISS.value
+
+        # Variantes progressivamente simplificadas do titulo. Quando uma fonte da
+        # MISS, a gente tenta a variante seguinte na mesma fonte antes de cascatear —
+        # cobre casos como "Song (Remastered 2011)" -> "Song" ou
+        # "Song *Live*!" -> "Song" (com normalizacao agressiva).
+        if cfg.title_variants_on_miss:
+            variants = title_variants(title)[: max(1, cfg.max_title_variants)]
+        else:
+            variants = [title]
+        if not variants:
+            variants = [title]
 
         last: LyricsResult | None = None
         attempts_total = 0
         for source in sources:
-            result, attempts = await _retry_fetch(source, artist, title, cfg)
-            attempts_total += attempts
-            last = result
+            result: LyricsResult | None = None
+            for variant in variants:
+                started = time.time()
+                result, attempts = await _retry_fetch(source, artist, variant, cfg)
+                elapsed_ms = int((time.time() - started) * 1000)
+                attempts_total += attempts
+                last = result
+                trace.append(
+                    {
+                        "ts": int(started),
+                        "source": source.name,
+                        "query_artist": artist,
+                        "query_title": variant,
+                        "raw_title": raw_title,
+                        "status": result.status.value,
+                        "source_url": result.source_url,
+                        "error": result.error,
+                        "attempts": attempts,
+                        "elapsed_ms": elapsed_ms,
+                        "lyrics_chars": len(result.lyrics) if result.lyrics else 0,
+                    }
+                )
+                if result.status in (Status.HIT, Status.BLOCKED):
+                    # HIT: terminou. BLOCKED: nao adianta insistir nessa fonte com
+                    # variantes — cascateia pra proxima.
+                    break
+            assert result is not None
             if result.status == Status.HIT:
                 async with cache_lock:
                     cache.upsert(
@@ -119,6 +186,7 @@ async def _process_track(
                         source_url=result.source_url,
                         lyrics=result.lyrics,
                         attempts=attempts_total,
+                        trace=_serialize_trace(trace),
                     )
                 return Status.HIT.value
 
@@ -134,6 +202,7 @@ async def _process_track(
                 source_url=last.source_url if last else None,
                 error=last.error if last else "no source",
                 attempts=attempts_total,
+                trace=_serialize_trace(trace),
             )
         return final_status
 

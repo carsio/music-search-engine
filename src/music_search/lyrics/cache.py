@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS lyrics (
     lyrics TEXT,
     error TEXT,
     attempts INTEGER NOT NULL DEFAULT 1,
-    fetched_at INTEGER NOT NULL
+    fetched_at INTEGER NOT NULL,
+    trace TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_lyrics_status ON lyrics(status);
 CREATE INDEX IF NOT EXISTS idx_lyrics_source ON lyrics(source);
@@ -39,6 +40,11 @@ class LyricsCache:
         self.conn.executescript(_SCHEMA)
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA synchronous=NORMAL")
+        # Migration in-place: cache antigo nao tem coluna `trace`. ALTER TABLE
+        # com IF NOT EXISTS nao existe em SQLite, entao a gente checa e adiciona.
+        cols = {row["name"] for row in self.conn.execute("PRAGMA table_info(lyrics)").fetchall()}
+        if "trace" not in cols:
+            self.conn.execute("ALTER TABLE lyrics ADD COLUMN trace TEXT")
         self.conn.commit()
 
     def has_resolved(
@@ -84,15 +90,16 @@ class LyricsCache:
         lyrics: str | None = None,
         error: str | None = None,
         attempts: int = 1,
+        trace: str | None = None,
     ) -> None:
         now = int(time.time())
         self.conn.execute(
             """
             INSERT INTO lyrics (
                 track_id, isrc, artist, title, status, source, source_url,
-                lyrics, error, attempts, fetched_at
+                lyrics, error, attempts, fetched_at, trace
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(track_id) DO UPDATE SET
                 isrc       = excluded.isrc,
                 artist     = excluded.artist,
@@ -103,7 +110,8 @@ class LyricsCache:
                 lyrics     = excluded.lyrics,
                 error      = excluded.error,
                 attempts   = lyrics.attempts + excluded.attempts,
-                fetched_at = excluded.fetched_at
+                fetched_at = excluded.fetched_at,
+                trace      = excluded.trace
             """,
             (
                 track_id,
@@ -117,6 +125,7 @@ class LyricsCache:
                 error,
                 attempts,
                 now,
+                trace,
             ),
         )
         self.conn.commit()
@@ -154,7 +163,7 @@ class LyricsCache:
         row = self.conn.execute(
             """
             SELECT track_id, isrc, artist, title, status, source, source_url,
-                   lyrics, error, attempts, fetched_at
+                   lyrics, error, attempts, fetched_at, trace
             FROM lyrics WHERE track_id = ?
             """,
             (track_id,),
