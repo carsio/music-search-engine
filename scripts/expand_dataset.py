@@ -20,7 +20,10 @@ faixas com filtros conservadores (`per_artist_cap=5`, `top_k_per_bucket=250`,
    - `--popularity-min` default 25 (antes 30)
 5. Escolhe novas candidatas ranqueadas por (popularidade desc, track_rowid)
    ate completar `--target` faixas.
-6. Salva o parquet final no mesmo caminho do dataset curado, sobrescrevendo.
+6. Enriquece a tabela com metadados ja existentes nos parquets originais:
+   album/artist stats, IDs Spotify, imagens, mercados, audio features e
+   metadados de arquivo quando disponiveis.
+7. Salva o parquet final no mesmo caminho do dataset curado, sobrescrevendo.
    Os HITs ja resolvidos continuam sendo pulados pelo pipeline (idempotencia
    via cache); o pipeline so ira processar as **novas** faixas.
 
@@ -35,7 +38,7 @@ Uso
         --per-artist-cap 50 \\
         --top-k-per-bucket 5000 \\
         --popularity-min 25 \\
-        --output data/derived/br_curated_tracks.parquet
+        --output data/derived/final/br_curated_tracks.parquet
 
     # Dry-run para inspecionar contagens sem escrever o parquet
     uv run python scripts/expand_dataset.py --dry-run
@@ -51,6 +54,8 @@ import sqlite3
 from pathlib import Path
 
 import duckdb
+
+from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH
 
 # Reutilizamos os mesmos termos / regex do notebook 04 para manter coerencia
 # sobre o que conta como "musica brasileira".
@@ -79,7 +84,13 @@ BR_REGEX = r"(^|[^a-z])(" + "|".join(BR_TERMS) + r")([^a-z]|$)"
 
 DEFAULT_DATASET_DIR = Path("data/spotify-metadata")
 DEFAULT_CLEAN_DIR = DEFAULT_DATASET_DIR / "spotify_clean_parquet"
-DEFAULT_OUTPUT = Path("data/derived/br_curated_tracks.parquet")
+DEFAULT_AUDIO_FEATURES_PATH = (
+    DEFAULT_DATASET_DIR / "spotify_clean_audio_features_parquet" / "track_audio_features.parquet"
+)
+DEFAULT_TRACK_FILES_PATH = (
+    DEFAULT_DATASET_DIR / "spotify_clean_track_files_parquet" / "track_files.parquet"
+)
+DEFAULT_OUTPUT = DEFAULT_CURATED_TRACKS_PATH
 DEFAULT_CACHE = Path("data/derived/lyrics_cache.sqlite")
 
 
@@ -143,6 +154,18 @@ def parse_args() -> argparse.Namespace:
         help="Caminho do parquet final.",
     )
     parser.add_argument(
+        "--audio-features",
+        type=Path,
+        default=DEFAULT_AUDIO_FEATURES_PATH,
+        help="Parquet de audio features do Spotify; se ausente, campos ficam NULL.",
+    )
+    parser.add_argument(
+        "--track-files",
+        type=Path,
+        default=DEFAULT_TRACK_FILES_PATH,
+        help="Parquet de metadados dos arquivos Spotify; se ausente, campos ficam NULL.",
+    )
+    parser.add_argument(
         "--target",
         type=int,
         default=50_000,
@@ -194,6 +217,9 @@ def main() -> None:
         args.clean_dir / "artists.parquet",
         args.clean_dir / "artist_genres.parquet",
         args.clean_dir / "albums.parquet",
+        args.clean_dir / "available_markets.parquet",
+        args.clean_dir / "album_images.parquet",
+        args.clean_dir / "artist_images.parquet",
     ]
     missing = [p for p in required_files if not p.exists()]
     if missing:
@@ -216,6 +242,11 @@ def main() -> None:
     artists_path = _sql_path(args.clean_dir / "artists.parquet")
     artist_genres_path = _sql_path(args.clean_dir / "artist_genres.parquet")
     albums_path = _sql_path(args.clean_dir / "albums.parquet")
+    available_markets_path = _sql_path(args.clean_dir / "available_markets.parquet")
+    album_images_path = _sql_path(args.clean_dir / "album_images.parquet")
+    artist_images_path = _sql_path(args.clean_dir / "artist_images.parquet")
+    audio_features_path = _sql_path(args.audio_features) if args.audio_features.exists() else None
+    track_files_path = _sql_path(args.track_files) if args.track_files.exists() else None
 
     con = duckdb.connect()
     # Listas de track_ids como tabelas temporarias para JOIN/EXCLUDE eficientes.
@@ -251,6 +282,7 @@ def main() -> None:
             SELECT
                 ta.track_rowid,
                 min(ta.artist_rowid) AS primary_artist_rowid,
+                string_agg(DISTINCT ar.id, ' | ' ORDER BY ar.id) AS artist_ids,
                 string_agg(DISTINCT ar.name, ' | ' ORDER BY ar.name) AS artist_names
             FROM br_track_ids b
             JOIN read_parquet('{track_artists_path}') ta
@@ -274,28 +306,59 @@ def main() -> None:
         SELECT
             t.id AS track_id,
             t.rowid AS track_rowid,
+            t.fetched_at AS track_fetched_at,
             coalesce(t.name, '') AS track_name,
+            coalesce(t.preview_url, '') AS preview_url,
             t.external_id_isrc AS isrc,
             CASE
                 WHEN substr(upper(coalesce(t.external_id_isrc, '')), 1, 2) = 'BR'
                 THEN TRUE ELSE FALSE
             END AS isrc_br,
+            t.track_number,
+            t.disc_number,
             ap.primary_artist_rowid,
+            par.id AS primary_artist_id,
             par.name AS primary_artist_name,
+            par.followers_total AS primary_artist_followers_total,
+            par.popularity AS primary_artist_popularity,
+            coalesce(ap.artist_ids, '') AS artist_ids,
             coalesce(ap.artist_names, '') AS artist_names,
             coalesce(gp.artist_genres, '') AS artist_genres,
+            alb.rowid AS album_rowid,
             alb.id AS album_id,
             coalesce(alb.name, '') AS album_name,
+            coalesce(alb.album_type, '') AS album_type,
+            coalesce(alb.label, '') AS album_label,
+            alb.popularity AS album_popularity,
+            alb.total_tracks AS album_total_tracks,
+            coalesce(alb.external_id_upc, '') AS album_upc,
+            coalesce(alb.copyright_c, '') AS album_copyright_c,
+            coalesce(alb.copyright_p, '') AS album_copyright_p,
             coalesce(alb.release_date, '') AS release_date,
+            coalesce(alb.release_date_precision, '') AS release_date_precision,
             try_cast(regexp_extract(coalesce(alb.release_date, ''), '^[0-9]{{4}}') AS INTEGER) AS release_year,
             t.popularity AS track_popularity,
             t.duration_ms,
-            cast(t.explicit AS BOOLEAN) AS explicit
+            cast(t.explicit AS BOOLEAN) AS explicit,
+            coalesce(tm.available_markets, '') AS track_available_markets,
+            CASE
+                WHEN coalesce(tm.available_markets, '') IN ('', 'unavailable') THEN 0
+                ELSE list_count(string_split(tm.available_markets, ','))
+            END AS track_available_markets_count,
+            coalesce(am.available_markets, '') AS album_available_markets,
+            CASE
+                WHEN coalesce(am.available_markets, '') IN ('', 'unavailable') THEN 0
+                ELSE list_count(string_split(am.available_markets, ','))
+            END AS album_available_markets_count
         FROM br_track_ids b
         JOIN read_parquet('{tracks_path}') t
           ON t.rowid = b.track_rowid
         LEFT JOIN read_parquet('{albums_path}') alb
           ON alb.rowid = t.album_rowid
+        LEFT JOIN read_parquet('{available_markets_path}') tm
+          ON tm.rowid = t.available_markets_rowid
+        LEFT JOIN read_parquet('{available_markets_path}') am
+          ON am.rowid = alb.available_markets_rowid
         LEFT JOIN artist_profile ap
           ON ap.track_rowid = t.rowid
         LEFT JOIN read_parquet('{artists_path}') par
@@ -315,7 +378,7 @@ def main() -> None:
         CREATE OR REPLACE TEMP TABLE br_with_macro AS
         SELECT
             *,
-            (release_year / 10) * 10 AS decade,
+            cast(floor(release_year / 10) * 10 AS INTEGER) AS decade,
             CASE
                 WHEN regexp_matches(lower(strip_accents(artist_genres)), '(^|[^a-z])(gospel)([^a-z]|$)') THEN 'gospel'
                 WHEN regexp_matches(lower(strip_accents(artist_genres)), '(^|[^a-z])(sertanejo|agronejo)([^a-z]|$)') THEN 'sertanejo'
@@ -442,6 +505,231 @@ def main() -> None:
         con.close()
         return
 
+    print("\nEnriquecendo selecao final com imagens, audio features e metadados de arquivo...")
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE album_best_images AS
+        WITH album_ids AS (
+            SELECT DISTINCT album_rowid
+            FROM br_final
+            WHERE album_rowid IS NOT NULL
+        ),
+        ranked AS (
+            SELECT
+                ai.album_rowid,
+                ai.url,
+                ai.width,
+                ai.height,
+                row_number() OVER (
+                    PARTITION BY ai.album_rowid
+                    ORDER BY ai.width * ai.height DESC NULLS LAST, ai.url
+                ) AS rn
+            FROM read_parquet('{album_images_path}') ai
+            JOIN album_ids ids ON ids.album_rowid = ai.album_rowid
+        )
+        SELECT album_rowid, url, width, height
+        FROM ranked
+        WHERE rn = 1
+        """
+    )
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE artist_best_images AS
+        WITH artist_ids AS (
+            SELECT DISTINCT primary_artist_rowid AS artist_rowid
+            FROM br_final
+            WHERE primary_artist_rowid IS NOT NULL
+        ),
+        ranked AS (
+            SELECT
+                ai.artist_rowid,
+                ai.url,
+                ai.width,
+                ai.height,
+                row_number() OVER (
+                    PARTITION BY ai.artist_rowid
+                    ORDER BY ai.width * ai.height DESC NULLS LAST, ai.url
+                ) AS rn
+            FROM read_parquet('{artist_images_path}') ai
+            JOIN artist_ids ids ON ids.artist_rowid = ai.artist_rowid
+        )
+        SELECT artist_rowid, url, width, height
+        FROM ranked
+        WHERE rn = 1
+        """
+    )
+
+    if audio_features_path:
+        con.execute(
+            f"""
+            CREATE OR REPLACE TEMP TABLE selected_audio_features AS
+            WITH ids AS (
+                SELECT DISTINCT track_id FROM br_final
+            ),
+            ranked AS (
+                SELECT
+                    af.*,
+                    row_number() OVER (
+                        PARTITION BY af.track_id
+                        ORDER BY try_cast(af.fetched_at AS BIGINT) DESC NULLS LAST
+                    ) AS rn
+                FROM read_parquet('{audio_features_path}') af
+                JOIN ids ON ids.track_id = af.track_id
+            )
+            SELECT
+                track_id,
+                try_cast(fetched_at AS BIGINT) AS audio_features_fetched_at,
+                CASE
+                    WHEN lower(coalesce(null_response, '0')) IN ('1', 'true') THEN FALSE
+                    ELSE TRUE
+                END AS audio_features_available,
+                try_cast(time_signature AS INTEGER) AS time_signature,
+                try_cast(tempo AS DOUBLE) AS tempo,
+                try_cast(key AS INTEGER) AS musical_key,
+                try_cast(mode AS INTEGER) AS musical_mode,
+                try_cast(danceability AS DOUBLE) AS danceability,
+                try_cast(energy AS DOUBLE) AS energy,
+                try_cast(loudness AS DOUBLE) AS loudness,
+                try_cast(speechiness AS DOUBLE) AS speechiness,
+                try_cast(acousticness AS DOUBLE) AS acousticness,
+                try_cast(instrumentalness AS DOUBLE) AS instrumentalness,
+                try_cast(liveness AS DOUBLE) AS liveness,
+                try_cast(valence AS DOUBLE) AS valence
+            FROM ranked
+            WHERE rn = 1
+            """
+        )
+    else:
+        print(f"  [skip] audio features ausente: {args.audio_features}")
+        con.execute(
+            """
+            CREATE OR REPLACE TEMP TABLE selected_audio_features AS
+            SELECT
+                NULL::VARCHAR AS track_id,
+                NULL::BIGINT AS audio_features_fetched_at,
+                NULL::BOOLEAN AS audio_features_available,
+                NULL::INTEGER AS time_signature,
+                NULL::DOUBLE AS tempo,
+                NULL::INTEGER AS musical_key,
+                NULL::INTEGER AS musical_mode,
+                NULL::DOUBLE AS danceability,
+                NULL::DOUBLE AS energy,
+                NULL::DOUBLE AS loudness,
+                NULL::DOUBLE AS speechiness,
+                NULL::DOUBLE AS acousticness,
+                NULL::DOUBLE AS instrumentalness,
+                NULL::DOUBLE AS liveness,
+                NULL::DOUBLE AS valence
+            WHERE FALSE
+            """
+        )
+
+    if track_files_path:
+        con.execute(
+            f"""
+            CREATE OR REPLACE TEMP TABLE selected_track_files AS
+            WITH ids AS (
+                SELECT DISTINCT track_id FROM br_final
+            ),
+            ranked AS (
+                SELECT
+                    tf.*,
+                    row_number() OVER (
+                        PARTITION BY tf.track_id
+                        ORDER BY
+                            CASE WHEN tf.status = 'success' THEN 1 ELSE 0 END DESC,
+                            tf.fetched_at DESC NULLS LAST
+                    ) AS rn
+                FROM read_parquet('{track_files_path}') tf
+                JOIN ids ON ids.track_id = tf.track_id
+            )
+            SELECT
+                track_id,
+                fetched_at AS track_file_fetched_at,
+                coalesce(status, '') AS track_file_status,
+                coalesce(session_country, '') AS track_file_session_country,
+                coalesce(language_of_performance, '') AS language_of_performance,
+                coalesce(artist_roles, '') AS artist_roles,
+                cast(has_lyrics AS BOOLEAN) AS spotify_has_lyrics,
+                coalesce(licensor, '') AS licensor,
+                coalesce(original_title, '') AS original_title,
+                coalesce(version_title, '') AS version_title,
+                coalesce(content_ratings, '') AS content_ratings,
+                filesize_bytes
+            FROM ranked
+            WHERE rn = 1
+            """
+        )
+    else:
+        print(f"  [skip] track files ausente: {args.track_files}")
+        con.execute(
+            """
+            CREATE OR REPLACE TEMP TABLE selected_track_files AS
+            SELECT
+                NULL::VARCHAR AS track_id,
+                NULL::BIGINT AS track_file_fetched_at,
+                NULL::VARCHAR AS track_file_status,
+                NULL::VARCHAR AS track_file_session_country,
+                NULL::VARCHAR AS language_of_performance,
+                NULL::VARCHAR AS artist_roles,
+                NULL::BOOLEAN AS spotify_has_lyrics,
+                NULL::VARCHAR AS licensor,
+                NULL::VARCHAR AS original_title,
+                NULL::VARCHAR AS version_title,
+                NULL::VARCHAR AS content_ratings,
+                NULL::BIGINT AS filesize_bytes
+            WHERE FALSE
+            """
+        )
+
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP TABLE br_final_enriched AS
+        SELECT
+            f.*,
+            abi.url AS album_image_url,
+            abi.width AS album_image_width,
+            abi.height AS album_image_height,
+            arbi.url AS primary_artist_image_url,
+            arbi.width AS primary_artist_image_width,
+            arbi.height AS primary_artist_image_height,
+            af.audio_features_fetched_at,
+            coalesce(af.audio_features_available, FALSE) AS audio_features_available,
+            af.time_signature,
+            af.tempo,
+            af.musical_key,
+            af.musical_mode,
+            af.danceability,
+            af.energy,
+            af.loudness,
+            af.speechiness,
+            af.acousticness,
+            af.instrumentalness,
+            af.liveness,
+            af.valence,
+            tf.track_file_fetched_at,
+            coalesce(tf.track_file_status, '') AS track_file_status,
+            coalesce(tf.track_file_session_country, '') AS track_file_session_country,
+            coalesce(tf.language_of_performance, '') AS language_of_performance,
+            coalesce(tf.artist_roles, '') AS artist_roles,
+            tf.spotify_has_lyrics,
+            coalesce(tf.licensor, '') AS licensor,
+            coalesce(tf.original_title, '') AS original_title,
+            coalesce(tf.version_title, '') AS version_title,
+            coalesce(tf.content_ratings, '') AS content_ratings,
+            tf.filesize_bytes
+        FROM br_final f
+        LEFT JOIN album_best_images abi
+          ON abi.album_rowid = f.album_rowid
+        LEFT JOIN artist_best_images arbi
+          ON arbi.artist_rowid = f.primary_artist_rowid
+        LEFT JOIN selected_audio_features af
+          ON af.track_id = f.track_id
+        LEFT JOIN selected_track_files tf
+          ON tf.track_id = f.track_id
+        """
+    )
+
     # ----- Exportar
     args.output.parent.mkdir(parents=True, exist_ok=True)
     output_sql_path = _sql_path(args.output)
@@ -450,22 +738,75 @@ def main() -> None:
         COPY (
             SELECT
                 track_id,
+                track_rowid,
+                track_fetched_at,
                 isrc,
                 isrc_br,
                 track_name,
+                preview_url,
+                track_number,
+                disc_number,
+                primary_artist_id,
                 primary_artist_name,
+                primary_artist_followers_total,
+                primary_artist_popularity,
+                artist_ids,
                 artist_names,
                 artist_genres,
                 macro_genre,
                 album_id,
+                album_rowid,
                 album_name,
+                album_type,
+                album_label,
+                album_popularity,
+                album_total_tracks,
+                album_upc,
+                album_copyright_c,
+                album_copyright_p,
                 release_date,
+                release_date_precision,
                 release_year,
                 decade,
                 track_popularity,
                 duration_ms,
-                explicit
-            FROM br_final
+                explicit,
+                track_available_markets,
+                track_available_markets_count,
+                album_available_markets,
+                album_available_markets_count,
+                album_image_url,
+                album_image_width,
+                album_image_height,
+                primary_artist_image_url,
+                primary_artist_image_width,
+                primary_artist_image_height,
+                audio_features_fetched_at,
+                audio_features_available,
+                time_signature,
+                tempo,
+                musical_key,
+                musical_mode,
+                danceability,
+                energy,
+                loudness,
+                speechiness,
+                acousticness,
+                instrumentalness,
+                liveness,
+                valence,
+                track_file_fetched_at,
+                track_file_status,
+                track_file_session_country,
+                language_of_performance,
+                artist_roles,
+                spotify_has_lyrics,
+                licensor,
+                original_title,
+                version_title,
+                content_ratings,
+                filesize_bytes
+            FROM br_final_enriched
             ORDER BY is_hit DESC, track_popularity DESC, track_rowid
         ) TO '{output_sql_path}' (FORMAT PARQUET)
         """

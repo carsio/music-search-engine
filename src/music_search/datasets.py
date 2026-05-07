@@ -16,9 +16,10 @@ from typing import TypedDict
 import duckdb
 
 DEFAULT_PARQUET_DIR = Path("data/spotify-metadata/spotify_clean_parquet")
-DEFAULT_CURATED_TRACKS_PATH = Path("data/derived/br_curated_tracks.parquet")
+DEFAULT_FINAL_DATASET_DIR = Path("data/derived/final")
+DEFAULT_CURATED_TRACKS_PATH = DEFAULT_FINAL_DATASET_DIR / "br_curated_tracks.parquet"
 DEFAULT_CURATED_LYRICS_PATH = Path("data/derived/lyrics.parquet")
-DEFAULT_CURATED_CORPUS_PATH = Path("data/derived/br_curated_lyrics.parquet")
+DEFAULT_CURATED_CORPUS_PATH = DEFAULT_FINAL_DATASET_DIR / "br_curated_lyrics.parquet"
 
 FIELDS: tuple[str, ...] = ("title", "album", "artist")
 CURATED_FIELDS: tuple[str, ...] = (

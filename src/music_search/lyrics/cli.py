@@ -16,6 +16,7 @@ from pathlib import Path
 
 import httpx
 
+from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH
 from music_search.lyrics.cache import LyricsCache
 from music_search.lyrics.normalize import normalize_artist, normalize_title
 from music_search.lyrics.pipeline import PipelineConfig, run_pipeline
@@ -29,7 +30,7 @@ from music_search.lyrics.sources import (
     VagalumeSource,
 )
 
-DEFAULT_PARQUET = Path("data/derived/br_curated_tracks.parquet")
+DEFAULT_PARQUET = DEFAULT_CURATED_TRACKS_PATH
 DEFAULT_CACHE = Path("data/derived/lyrics_cache.sqlite")
 DEFAULT_EXPORT = Path("data/derived/lyrics.parquet")
 

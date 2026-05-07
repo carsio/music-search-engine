@@ -14,7 +14,11 @@ data/*
 !data/.gitkeep
 !data/derived/
 data/derived/*
-!data/derived/br_curated_lyrics.parquet
+!data/derived/final/
+data/derived/final/*
+!data/derived/final/README.md
+!data/derived/final/br_*.parquet
+!data/derived/final/br_dataset_manifest.json
 
 # IDE
 .idea/
