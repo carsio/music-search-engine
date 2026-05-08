@@ -9,10 +9,10 @@ arquivos intermediarios e o Spotify Metadata bruto ficam fora daqui.
 | --- | ---: | --- |
 | `br_curated_tracks.parquet` | 50.000 | Tabela principal de faixas brasileiras curadas a partir do Spotify Metadata. Contem metadados estruturados, popularidade, album, artistas, generos, imagens, mercados, audio features e metadados de arquivo. |
 | `br_curated_lyrics.parquet` | 36.017 | Corpus de busca textual. E um recorte de `br_curated_tracks.parquet` apenas com faixas que possuem letra consolidada no cache de letras. |
-| `br_artists.parquet` | 0 | Dimensao de artistas enriquecida por Wikipedia + LLM. Gerada por `scripts/export_entities.py` quando houver hits em `enrichment_cache.sqlite`. |
-| `br_albums.parquet` | 0 | Dimensao de albuns enriquecida por Wikipedia + LLM. |
-| `br_genres.parquet` | 0 | Dimensao de generos enriquecida por Wikipedia + LLM. |
-| `br_composers.parquet` | 0 | Dimensao de compositores/letristas enriquecida por Wikipedia + LLM. |
+| `br_artists.parquet` | 0 | Dimensao de artistas enriquecida a partir da Wikipedia PT. Gerada por `scripts/export_entities.py` quando houver hits materializados em `enrichment_cache.sqlite`. |
+| `br_albums.parquet` | 0 | Dimensao de albuns enriquecida a partir da Wikipedia PT. |
+| `br_genres.parquet` | 0 | Dimensao de generos enriquecida a partir da Wikipedia PT. |
+| `br_composers.parquet` | 0 | Dimensao de compositores/letristas enriquecida a partir da Wikipedia PT. |
 | `br_dataset_manifest.json` | - | Manifesto com versao do dataset, data de geracao, tamanho, hash SHA1 e contagem de registros por arquivo. |
 
 Os arquivos de entidade podem nao existir ainda. A aplicacao foi escrita para degradar
@@ -66,15 +66,19 @@ Colunas principais:
 | `lyrics_source`, `lyrics_source_url` | Fonte de onde a letra foi obtida. |
 | `lyrics` | Texto completo da letra usado no indice BM25/TF-IDF. |
 
-## Entidades enriquecidas por LLM
+## Entidades enriquecidas pela Wikipedia
 
 As dimensoes `br_artists.parquet`, `br_albums.parquet`, `br_genres.parquet` e
 `br_composers.parquet` sao produzidas em outro passo:
+
+Para `genres`, o default usa seeds detalhadas derivadas de `artist_genres`; use
+`--seed-mode macro` se quiser restringir a coleta aos macro-generos curados.
 
 ```powershell
 uv run python -m music_search.enrichment artists --limit 500 --concurrency 4
 uv run python -m music_search.enrichment albums --limit 500 --concurrency 4
 uv run python -m music_search.enrichment genres --concurrency 4
+uv run python -m music_search.enrichment genres --concurrency 4 --seed-mode macro
 uv run python -m music_search.enrichment composers --limit 500 --concurrency 4
 uv run python scripts/export_entities.py
 uv run python scripts/build_dataset.py --skip-lyrics
@@ -86,9 +90,8 @@ uv run python -m music_search.enrichment.ui_tk
 A interface mostra o progresso por etapa, logs e os artefatos finais gerados
 (parquets de entidades + manifesto), para acompanhar o pipeline completo.
 
-A LLM entra apenas para transformar HTML/texto da Wikipedia em JSON estruturado.
-Campos ja estruturados no Spotify, como popularidade, seguidores, imagens, datas,
-audio features e mercados, devem continuar vindo do pipeline deterministico.
+O pipeline baixa texto da Wikipedia PT, limpa esse conteudo e materializa um payload minimo e deterministico por entidade. Os parquets preservam `source`, `source_url` e `raw_text` para busca textual nas dimensoes.
+Campos ja estruturados no Spotify, como popularidade, seguidores, imagens, datas, audio features e mercados, devem continuar vindo do pipeline deterministico.
 
 ## Como regenerar
 

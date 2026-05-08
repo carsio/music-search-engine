@@ -1,18 +1,20 @@
 .hero {
-  min-height: 70vh;
+  flex: 0 1 768px;
+  width: 100%;
+  max-width: 768px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 80px 24px 40px;
-  background:
-    radial-gradient(circle at 20% 10%, color-mix(in oklab, var(--accent) 18%, transparent), transparent 50%),
-    radial-gradient(circle at 90% 80%, color-mix(in oklab, var(--accent) 12%, transparent), transparent 50%),
-    var(--bg);
+  padding: 64px 24px 0;
+  background: transparent;
 }
 
 .inner {
+  flex: 0 1 720px;
   width: 100%;
   max-width: 720px;
+  min-width: 0;
+  margin: 0 auto;
   text-align: center;
 }
 
@@ -72,7 +74,8 @@
 }
 
 .search {
-  margin: 36px auto 22px;
+  width: 100%;
+  margin: 36px auto 0;
 }
 
 @media (max-width: 640px) {
@@ -80,6 +83,6 @@
     font-size: 64px;
   }
   .hero {
-    padding: 48px 20px;
+    padding: 20px;
   }
 }

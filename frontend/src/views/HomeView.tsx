@@ -1,6 +1,7 @@
 import { HomeHero } from "../components/home/HomeHero";
 import { HomeChips } from "../components/home/HomeChips";
 import { HomeStats } from "../components/home/HomeStats";
+import styles from "./HomeView.module.css";
 
 interface HomeViewProps {
   onSubmit: (q: string) => void;
@@ -17,10 +18,14 @@ const SUGGESTIONS = [
 
 export function HomeView({ onSubmit }: HomeViewProps) {
   return (
-    <>
-      <HomeHero onSubmit={onSubmit} />
-      <HomeChips items={SUGGESTIONS} onPick={onSubmit} />
-      <HomeStats />
-    </>
+    <div className={styles.page}>
+      <div className={styles.heroBlock}>
+        <HomeHero onSubmit={onSubmit} />
+      </div>
+      <div className={styles.meta}>
+        <HomeChips items={SUGGESTIONS} onPick={onSubmit} />
+        <HomeStats />
+      </div>
+    </div>
   );
 }

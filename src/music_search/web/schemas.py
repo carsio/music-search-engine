@@ -22,6 +22,48 @@ class TrackRef(BaseModel):
     plays: str | None = None
 
 
+class AlbumTrack(BaseModel):
+    id: str
+    title: str
+    disc_number: int | None = None
+    track_number: int | None = None
+    duration: str | None = None
+    duration_ms: int | None = None
+    popularity: int | None = None
+    preview_url: str | None = None
+    explicit: bool = False
+
+
+class AlbumArtistSummary(BaseModel):
+    id: str
+    name: str
+    image_url: str | None = None
+    genres: list[str] = Field(default_factory=list)
+    popularity: int | None = None
+    followers_total: int | None = None
+    top_tracks: list[TrackRef] = Field(default_factory=list)
+    albums: list[AlbumRef] = Field(default_factory=list)
+
+
+class AlbumResponse(BaseModel):
+    id: str
+    title: str
+    artist: str
+    artist_id: str | None = None
+    year: int | None = None
+    description: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    tracks_count: int | None = None
+    cover_url: str | None = None
+    artist_image_url: str | None = None
+    album_type: str | None = None
+    label: str | None = None
+    duration: str | None = None
+    total_duration_ms: int | None = None
+    tracks: list[AlbumTrack] = Field(default_factory=list)
+    artist_summary: AlbumArtistSummary
+
+
 class ArtistResponse(BaseModel):
     id: str
     name: str

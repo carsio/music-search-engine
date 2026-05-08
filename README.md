@@ -8,7 +8,7 @@ Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFA
 
 ## Visão geral
 
-O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, BM25) e a busca vetorial densa (embeddings + Milvus), e expõe esse motor através de uma API FastAPI consumida por um frontend React. Os dados foram curados a partir do Spotify Metadata e enriquecidos com letras (lyrics.ovh, Vagalume, letras.mus.br, Genius) e biografias da Wikipedia processadas por LLM.
+O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, BM25) e a busca vetorial densa (embeddings + Milvus), e expõe esse motor através de uma API FastAPI consumida por um frontend React. Os dados foram curados a partir do Spotify Metadata e enriquecidos com letras (lyrics.ovh, Vagalume, letras.mus.br, Genius) e conteúdo da Wikipedia PT materializado de forma determinística para as entidades.
 
 ## Como o projeto está organizado
 
@@ -45,7 +45,7 @@ O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, 
 │         ↓                                                       │
 │  data/derived/final/br_curated_lyrics.parquet ← CORPUS PRINCIPAL│
 │                                                                 │
-│  enrichment/ (Wikipedia PT text/API → LLM extrai JSON estruturado)│
+│  enrichment/ (Wikipedia PT text/API → materializacao local)     │
 │         ↓                                                       │
 │  scripts/export_entities.py                                     │
 │         ↓                                                       │
@@ -53,7 +53,7 @@ O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, 
 │                                                                 │
 │  Componentes auxiliares:                                        │
 │  _async_http/  — http async com cache+throttle+circuit breaker  │
-│  llm/          — cliente NIM (intent / rerank / extract JSON)   │
+│  llm/          — cliente NIM opcional (intent / rerank)         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -76,7 +76,7 @@ Os datasets finais em `data/derived/final/` vão versionados no repo, então **n
 
 ### Variáveis de ambiente
 
-Use `.env.example` como template local. O projeto lê variáveis do ambiente; se você usar um arquivo `.env`, carregue-o no terminal/VSCode antes de executar os comandos. O projeto não define endpoint de LLM por padrão; configure explicitamente uma API OpenAI-compatível quando for rodar enrichment, classificação por LLM ou rerank.
+Use `.env.example` como template local. O projeto lê variáveis do ambiente; se você usar um arquivo `.env`, carregue-o no terminal/VSCode antes de executar os comandos. O projeto não define endpoint de LLM por padrão; configure explicitamente uma API OpenAI-compatível apenas quando for rodar classificação por LLM ou rerank.
 
 ```powershell
 $env:NIM_API_KEY="sua-chave"
@@ -158,7 +158,7 @@ O dataset final fica separado em tabelas Parquet, para evitar repetir dados text
 
 - `data/derived/final/br_curated_tracks.parquet`: tabela principal de 50.000 faixas brasileiras. É determinística e vem do Spotify Metadata original; inclui IDs, artistas, gêneros, álbum, label, popularidades, followers do artista primário, mercados disponíveis, audio features, metadados de arquivo e capas.
 - `data/derived/final/br_curated_lyrics.parquet`: corpus de busca com as faixas que já têm letra consolidada.
-- `data/derived/final/br_{artist,album,genre,composer}s.parquet`: dimensões enriquecidas por Wikipedia + LLM, quando geradas.
+- `data/derived/final/br_{artist,album,genre,composer}s.parquet`: dimensões enriquecidas a partir da Wikipedia PT, quando geradas.
 - `data/derived/final/br_dataset_manifest.json`: versão, contagens, tamanho e hash SHA1 dos arquivos.
 - `data/derived/final/README.md`: dicionário curto dos arquivos e dos principais grupos de colunas.
 
@@ -196,29 +196,30 @@ uv run python scripts/build_curated_corpus.py
 
 Variáveis opcionais: `VAGALUME_API_KEY`, `GENIUS_TOKEN`. Sem elas, ainda funciona via letras.mus.br + lyrics.ovh.
 
-### Enriquecimento (Wikipedia + LLM → entidades)
+### Enriquecimento (Wikipedia → entidades)
 
-Requer uma LLM exposta por API OpenAI-compatível. Configure `NIM_API_KEY` e `NIM_BASE_URL` no seu ambiente local; use `.env.example` como referência de nomes de variáveis.
-
-A LLM entra somente para estruturar texto não estruturado. O fluxo é:
+O enrichment offline nao requer LLM. O fluxo usa apenas seeds do corpus curado, coleta texto da Wikipedia PT e materializa um payload minimo e deterministico por entidade. O fluxo e:
 
 ```text
 br_curated_tracks.parquet
   → seeds de artistas/álbuns/gêneros/compositores
   → WikipediaPTSource baixa texto (Wikipedia-API; fallback HTML)
-  → llm.tasks.extract_*_json transforma conteudo em JSON
+  → materializacao local transforma texto em payload pesquisavel
   → data/derived/enrichment_cache.sqlite
   → scripts/export_entities.py
   → br_artists.parquet / br_albums.parquet / br_genres.parquet / br_composers.parquet
 ```
 
-Use LLM para biografia, origem, descrição, obras e relações entre entidades. Não use LLM para campos que já vêm estruturados do Spotify, como popularidade, followers, audio features, datas, label, mercados e capas.
+Os parquets resultantes preservam `source`, `source_url` e texto bruto limpo (`raw_text`) para indexacao leve. Campos ja estruturados do Spotify, como popularidade, followers, audio features, datas, label, mercados e capas, continuam fora desse enrichment e seguem vindo do pipeline deterministico principal.
+
+Para `genres`, o default agora usa seeds detalhadas derivadas de `artist_genres`; use `--seed-mode macro` para voltar à taxonomia curada de macro-gêneros.
 
 ```bash
-# Buscar conteudo da Wikipedia + extrair JSON via LLM (1 entidade por vez)
+# Buscar conteudo da Wikipedia e materializar payload local (1 entidade por vez)
 uv run python -m music_search.enrichment artists --limit 500 --concurrency 4
 uv run python -m music_search.enrichment albums  --limit 500 --concurrency 4
 uv run python -m music_search.enrichment genres --concurrency 4
+uv run python -m music_search.enrichment genres --concurrency 4 --seed-mode macro
 uv run python -m music_search.enrichment composers --limit 500 --concurrency 4
 
 # Cache → parquets
@@ -257,8 +258,8 @@ src/music_search/
 │
 ├── vector/             # Busca densa (embeddings + Milvus)
 ├── lyrics/             # Pipeline de extração de letras
-├── enrichment/         # Wikipedia text/API → LLM → entidades estruturadas
-├── llm/                # Cliente NIM (intent / rerank / extract JSON)
+├── enrichment/         # Wikipedia text/API → materializacao local → entidades estruturadas
+├── llm/                # Cliente NIM opcional (intent / rerank)
 ├── _async_http/        # http async reusável (cache + throttle + circuit breaker)
 └── web/
     ├── app.py          # API FastAPI
@@ -304,7 +305,7 @@ data/spotify-metadata/  # Spotify raw (gitignored, baixado on-demand)
 
 ### 🟡 Em andamento
 
-- **Enrichment de entidades** (`enrichment/` + `llm/`): pipeline funciona, mas os parquets `br_{artist,album,genre,composer}s.parquet` ainda não estão gerados/commitados. A API roda sem eles, mas `/artist/{id}` cai num fallback derivado dos tracks.
+- **Enrichment de entidades** (`enrichment/`): pipeline agora materializa dados da Wikipedia sem depender de LLM, mas os parquets `br_{artist,album,genre,composer}s.parquet` ainda precisam ser gerados/commitados. A API roda sem eles, mas `/artist/{id}` cai num fallback derivado dos tracks.
 - **MultiEntityIndex** depende dos parquets acima; está integrado mas só populado parcialmente.
 - **Frontend**: estrutura e rotas montadas; alguns painéis mockados aguardam dados de enrichment.
 

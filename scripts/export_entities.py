@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 
 from music_search.datasets import DEFAULT_FINAL_DATASET_DIR
 from music_search.enrichment.pipeline import (
@@ -76,7 +77,7 @@ def export_kind(
 
     con = duckdb.connect()
     try:
-        con.register("records", records)  # type: ignore[arg-type]
+        con.register("records", pd.DataFrame.from_records(records))
         con.execute(
             f"COPY (SELECT * FROM records) TO '{output.as_posix()}' "
             "(FORMAT PARQUET, COMPRESSION ZSTD)"
@@ -99,6 +100,7 @@ def _normalize_record(record: dict, kind: str) -> dict:
         "id": str(record.get("id") or ""),
         "source": str(record.get("source") or ""),
         "source_url": str(record.get("source_url") or ""),
+        "raw_text": str(record.get("raw_text") or "") or None,
     }
     if kind == "artist":
         return {

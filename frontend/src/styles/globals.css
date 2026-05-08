@@ -2,6 +2,16 @@
 @import "./reset.css";
 @import "./animations.css";
 
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body,
+#root {
+  min-height: 100%;
+}
+
 body {
   background: var(--bg);
   color: var(--ink);
@@ -10,6 +20,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
 code {

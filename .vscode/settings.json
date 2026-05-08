@@ -1,0 +1,31 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests"],
+  "python.analysis.extraPaths": ["${workspaceFolder}/src"],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "ruff.nativeServer": "on",
+  "files.exclude": {
+    "**/.git": true,
+    "**/.mypy_cache": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/__pycache__": true,
+    "**/.venv": true,
+    "**/node_modules": true
+  },
+  "search.exclude": {
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/__pycache__": true,
+    "**/data/spotify-metadata": true,
+    "**/frontend/dist": true,
+    "uv.lock": true
+  }
+}

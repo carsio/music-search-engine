@@ -1,1 +1,1 @@
-export { AlbumPanel } from "./AlbumPanel";
+export { AlbumPanel, AlbumSidebar } from "./AlbumPanel";

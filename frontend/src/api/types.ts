@@ -43,15 +43,59 @@ export interface LyricSearchResponse {
 }
 
 export interface AlbumRef {
+  id?: string;
   title: string;
   year?: number | null;
   tracks?: number | null;
 }
 
 export interface TrackRef {
+  id?: string;
   title: string;
   album?: string | null;
   plays?: string | null;
+}
+
+export interface AlbumTrack {
+  id: string;
+  title: string;
+  disc_number?: number | null;
+  track_number?: number | null;
+  duration?: string | null;
+  duration_ms?: number | null;
+  popularity?: number | null;
+  preview_url?: string | null;
+  explicit?: boolean;
+}
+
+export interface AlbumArtistSummary {
+  id: string;
+  name: string;
+  image_url?: string | null;
+  genres: string[];
+  popularity?: number | null;
+  followers_total?: number | null;
+  top_tracks: TrackRef[];
+  albums: AlbumRef[];
+}
+
+export interface AlbumResponse {
+  id: string;
+  title: string;
+  artist: string;
+  artist_id?: string | null;
+  year?: number | null;
+  description?: string | null;
+  tags: string[];
+  tracks_count?: number | null;
+  cover_url?: string | null;
+  artist_image_url?: string | null;
+  album_type?: string | null;
+  label?: string | null;
+  duration?: string | null;
+  total_duration_ms?: number | null;
+  tracks: AlbumTrack[];
+  artist_summary: AlbumArtistSummary;
 }
 
 export interface ArtistResponse {

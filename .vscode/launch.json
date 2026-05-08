@@ -14,7 +14,7 @@
         "--port",
         "8000"
       ],
-      "python": "${workspaceFolder}/.venv/bin/python",
+      "python": "${config:python.defaultInterpreterPath}",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": false,

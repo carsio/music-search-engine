@@ -5,6 +5,7 @@ Endpoints:
 - GET /search?q=&top=10&algorithm=bm25      busca generica com classificacao de intent
 - GET /search/lyric?q=&top=20               busca exclusivamente em letras com snippets
 - GET /artist/{id}                          knowledge panel de artista
+- GET /album/{id}                           pagina de album derivada do dataset atual
 - GET /song/{id}                            pagina de musica com letra
 """
 
@@ -22,7 +23,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from music_search.multi_index import MultiEntityIndex
 from music_search.search import SparseSearchEngine, load_or_build_default_engine
 from music_search.web.schemas import (
+    AlbumArtistSummary,
+    AlbumResponse,
     AlbumRef,
+    AlbumTrack,
     ArtistResponse,
     LyricMatch,
     LyricSearchResponse,
@@ -387,6 +391,15 @@ def get_artist(artist_id: str) -> ArtistResponse:
     )
 
 
+@app.get("/album/{album_id}", response_model=AlbumResponse)
+def get_album(album_id: str) -> AlbumResponse:
+    multi: MultiEntityIndex = app.state.multi
+    payload = multi.get_album(album_id)
+    if payload is None:
+        raise HTTPException(404, f"album {album_id!r} nao encontrado")
+    return _album_response_from_payload(payload)
+
+
 @app.get("/song/{song_id}", response_model=SongResponse)
 def get_song(song_id: str) -> SongResponse:
     engine: SparseSearchEngine = app.state.track_engine
@@ -408,6 +421,61 @@ def get_song(song_id: str) -> SongResponse:
         lyrics_source_url=str(doc.get("lyrics_source_url") or "") or None,
         genres=[g.strip() for g in str(doc.get("artist_genres") or "").split(",") if g.strip()],
         macro_genre=str(doc.get("macro_genre") or "") or None,
+    )
+
+
+def _album_response_from_payload(payload: dict[str, Any]) -> AlbumResponse:
+    artist_summary = payload.get("artist_summary") or {}
+    tracks = [
+        AlbumTrack(**track)
+        for track in (payload.get("tracks") or [])
+        if isinstance(track, dict)
+    ]
+    top_tracks = [
+        TrackRef(
+            title=str(track.get("title") or ""),
+            album=str(track.get("album") or "") or None,
+            plays=str(track.get("plays") or "") or None,
+        )
+        for track in (artist_summary.get("top_tracks") or [])
+        if isinstance(track, dict)
+    ]
+    albums = [
+        AlbumRef(
+            title=str(album.get("title") or ""),
+            year=album.get("year"),
+            tracks=album.get("tracks"),
+        )
+        for album in (artist_summary.get("albums") or [])
+        if isinstance(album, dict)
+    ]
+    summary = AlbumArtistSummary(
+        id=str(artist_summary.get("id") or payload.get("artist_id") or ""),
+        name=str(artist_summary.get("name") or payload.get("artist") or ""),
+        image_url=str(artist_summary.get("image_url") or "") or None,
+        genres=list(artist_summary.get("genres") or []),
+        popularity=artist_summary.get("popularity"),
+        followers_total=artist_summary.get("followers_total"),
+        top_tracks=top_tracks,
+        albums=albums,
+    )
+    return AlbumResponse(
+        id=str(payload.get("id") or ""),
+        title=str(payload.get("title") or ""),
+        artist=str(payload.get("artist") or ""),
+        artist_id=str(payload.get("artist_id") or "") or None,
+        year=payload.get("year"),
+        description=str(payload.get("description") or "") or None,
+        tags=list(payload.get("tags") or []),
+        tracks_count=payload.get("tracks_count"),
+        cover_url=str(payload.get("cover_url") or "") or None,
+        artist_image_url=str(payload.get("artist_image_url") or "") or None,
+        album_type=str(payload.get("album_type") or "") or None,
+        label=str(payload.get("label") or "") or None,
+        duration=str(payload.get("duration") or "") or None,
+        total_duration_ms=payload.get("total_duration_ms"),
+        tracks=tracks,
+        artist_summary=summary,
     )
 
 

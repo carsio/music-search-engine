@@ -79,7 +79,15 @@ export function ResultsRouter({ query, onSubmit }: ResultsRouterProps) {
     case "genre":
       return <GenreView query={query} response={response} onSubmit={onSubmit} />;
     case "album":
-      return <AlbumView query={query} response={response} onSubmit={onSubmit} />;
+      return (
+        <AlbumView
+          query={query}
+          response={response}
+          album={flow.album}
+          isEnriching={flow.isEnriching}
+          onSubmit={onSubmit}
+        />
+      );
     default:
       return <NoResultsView query={query} onSubmit={onSubmit} />;
   }

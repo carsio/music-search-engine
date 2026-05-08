@@ -1,6 +1,7 @@
 import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
 import { api } from "./client";
 import type {
+  AlbumResponse,
   ArtistResponse,
   HealthResponse,
   LyricSearchResponse,
@@ -65,6 +66,19 @@ export function useArtist(
     queryKey: ["artist", id],
     queryFn: async () => {
       const { data } = await api.get<ArtistResponse>(`/artist/${id}`);
+      return data;
+    },
+  });
+}
+
+export function useAlbum(id: string | null | undefined, opts: Opts<AlbumResponse> = {}) {
+  const { enabled, staleTime = 60_000 } = opts;
+  return useQuery({
+    enabled: (enabled ?? true) && !!id,
+    staleTime,
+    queryKey: ["album", id],
+    queryFn: async () => {
+      const { data } = await api.get<AlbumResponse>(`/album/${id}`);
       return data;
     },
   });

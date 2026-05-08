@@ -1,4 +1,4 @@
-"""Indice multi-entidade: tracks (existente) + artistas/albuns/generos/compositores.
+"""Indice multi-entidade: tracks + catalogo de albuns + entidades opcionais.
 
 Tracks continuam usando `SparseSearchEngine` (search.py) sem mudancas. Para as outras
 entidades, este modulo define `EntityIndex`, uma versao mais leve do search engine
@@ -9,6 +9,7 @@ que indexa registros simples (dict) e retorna hits generrcos contendo o payload.
 
 from __future__ import annotations
 
+import pickle
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -17,7 +18,12 @@ from typing import Any, Literal
 
 import duckdb
 
-from music_search.datasets import DEFAULT_FINAL_DATASET_DIR
+from music_search.albums import (
+    AlbumDocument,
+    build_album_search_records,
+    load_album_catalog_from_tracks,
+)
+from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH, DEFAULT_FINAL_DATASET_DIR
 from music_search.indexer import IndexBuilder, InvertedIndex
 from music_search.ranking import BM25, TFIDF
 
@@ -32,20 +38,36 @@ DEFAULT_PARQUETS: dict[NonTrackEntity, Path] = {
     "genre": DEFAULT_FINAL_DATASET_DIR / "br_genres.parquet",
     "composer": DEFAULT_FINAL_DATASET_DIR / "br_composers.parquet",
 }
+DEFAULT_ENTITY_INDEX_PATHS: dict[NonTrackEntity, Path] = {
+    kind: DEFAULT_INDEX_DIR / f"entity_{kind}.pkl" for kind in DEFAULT_PARQUETS
+}
 
 # Campos a indexar por entidade. Pesos sao defaults; podem ser sobrescritos por param.
 ENTITY_FIELDS: dict[NonTrackEntity, tuple[str, ...]] = {
-    "artist": ("name", "tagline", "bio", "genres", "origin"),
-    "album": ("title", "artist", "description"),
-    "genre": ("name", "description", "origin", "representative_artists"),
-    "composer": ("name", "bio", "genres"),
+    "artist": ("name", "tagline", "bio", "raw_text", "genres", "origin"),
+    "album": ("title", "artist", "description", "raw_text"),
+    "genre": ("name", "description", "raw_text", "origin", "representative_artists"),
+    "composer": ("name", "bio", "raw_text", "genres"),
 }
 
 ENTITY_WEIGHTS: dict[NonTrackEntity, dict[str, float]] = {
-    "artist": {"name": 5.0, "tagline": 1.5, "bio": 1.0, "genres": 2.0, "origin": 0.5},
-    "album": {"title": 5.0, "artist": 2.0, "description": 1.0},
-    "genre": {"name": 5.0, "description": 1.0, "origin": 0.5, "representative_artists": 2.0},
-    "composer": {"name": 5.0, "bio": 1.0, "genres": 1.0},
+    "artist": {
+        "name": 5.0,
+        "tagline": 1.5,
+        "bio": 1.0,
+        "raw_text": 0.75,
+        "genres": 2.0,
+        "origin": 0.5,
+    },
+    "album": {"title": 5.0, "artist": 2.0, "description": 1.0, "raw_text": 0.5},
+    "genre": {
+        "name": 5.0,
+        "description": 1.0,
+        "raw_text": 0.75,
+        "origin": 0.5,
+        "representative_artists": 2.0,
+    },
+    "composer": {"name": 5.0, "bio": 1.0, "raw_text": 0.75, "genres": 1.0},
 }
 
 
@@ -117,6 +139,20 @@ class EntityIndex:
     def num_docs(self) -> int:
         return self.index.num_docs
 
+    def save(self, path: str | Path) -> None:
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("wb") as file:
+            pickle.dump(self, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    @classmethod
+    def load(cls, path: str | Path) -> EntityIndex:
+        with Path(path).open("rb") as file:
+            obj = pickle.load(file)
+        if not isinstance(obj, cls):
+            raise TypeError(f"arquivo não contém {cls.__name__}: {type(obj).__name__}")
+        return obj
+
     def search(
         self,
         query: str,
@@ -170,12 +206,43 @@ def load_records_from_parquet(path: Path) -> list[dict[str, Any]]:
         con.close()
 
 
+def _can_reuse_index(*, index_path: Path, source_path: Path) -> bool:
+    if not index_path.exists() or not source_path.exists():
+        return False
+    return index_path.stat().st_mtime >= source_path.stat().st_mtime
+
+
+def _load_persisted_entity_index(path: Path) -> EntityIndex | None:
+    try:
+        return EntityIndex.load(path)
+    except (AttributeError, EOFError, ModuleNotFoundError, OSError, TypeError, pickle.UnpicklingError):
+        return None
+
+
+def _load_or_build_entity_index(
+    kind: NonTrackEntity,
+    records: Iterable[Mapping[str, Any]],
+    *,
+    source_path: Path,
+    index_path: Path,
+) -> EntityIndex:
+    if _can_reuse_index(index_path=index_path, source_path=source_path):
+        cached = _load_persisted_entity_index(index_path)
+        if cached is not None:
+            return cached
+
+    entity_index = EntityIndex.build(kind, records)
+    entity_index.save(index_path)
+    return entity_index
+
+
 @dataclass
 class MultiEntityIndex:
     """Fachada juntando indice de tracks (SparseSearchEngine) + entidades nao-track."""
 
     track_engine: Any | None = None  # SparseSearchEngine — opcional
     entity_indexes: dict[NonTrackEntity, EntityIndex] = field(default_factory=dict)
+    album_catalog: dict[str, AlbumDocument] = field(default_factory=dict)
 
     @classmethod
     def from_parquets(
@@ -183,20 +250,53 @@ class MultiEntityIndex:
         *,
         track_engine: Any | None = None,
         parquets: Mapping[NonTrackEntity, Path] | None = None,
+        index_paths: Mapping[NonTrackEntity, Path] | None = None,
+        album_catalog: Mapping[str, AlbumDocument] | None = None,
     ) -> MultiEntityIndex:
-        parquets = dict(parquets or DEFAULT_PARQUETS)
+        parquets = dict(DEFAULT_PARQUETS if parquets is None else parquets)
+        resolved_index_paths = dict(DEFAULT_ENTITY_INDEX_PATHS)
+        if index_paths is not None:
+            resolved_index_paths.update(index_paths)
         entity_indexes: dict[NonTrackEntity, EntityIndex] = {}
+        resolved_album_catalog = dict(
+            load_album_catalog_from_tracks() if album_catalog is None else album_catalog
+        )
+        if resolved_album_catalog:
+            album_records = build_album_search_records(resolved_album_catalog.values())
+            if album_catalog is None:
+                entity_indexes["album"] = _load_or_build_entity_index(
+                    "album",
+                    album_records,
+                    source_path=DEFAULT_CURATED_TRACKS_PATH,
+                    index_path=resolved_index_paths["album"],
+                )
+            else:
+                entity_indexes["album"] = EntityIndex.build("album", album_records)
         for kind, path in parquets.items():
+            if kind == "album" and resolved_album_catalog:
+                continue
             records = load_records_from_parquet(path)
             if not records:
                 continue
-            entity_indexes[kind] = EntityIndex.build(kind, records)
-        return cls(track_engine=track_engine, entity_indexes=entity_indexes)
+            entity_indexes[kind] = _load_or_build_entity_index(
+                kind,
+                records,
+                source_path=path,
+                index_path=resolved_index_paths[kind],
+            )
+        return cls(
+            track_engine=track_engine,
+            entity_indexes=entity_indexes,
+            album_catalog=resolved_album_catalog,
+        )
 
     def has(self, kind: EntityKind) -> bool:
         if kind == "track":
             return self.track_engine is not None
         return kind in self.entity_indexes
+
+    def get_album(self, album_id: str) -> AlbumDocument | None:
+        return self.album_catalog.get(album_id)
 
     def search_entity(
         self,
@@ -219,29 +319,83 @@ class MultiEntityIndex:
         algorithm: SearchAlgorithm = "bm25",
         top_k: int = 10,
     ) -> dict[str, Any]:
-        """Roteia a busca pelo intent. Sempre devolve `{intent_used, hits}`.
-
-        Fallback para `track` quando intent eh `lyric|song|none` ou indisponivel.
-        """
+        """Seleciona o tipo vencedor comparando candidatos disponiveis."""
         normalized = intent.lower().strip()
-        for entity in ("artist", "album", "genre"):
-            if normalized == entity and self.has(entity):  # type: ignore[arg-type]
-                hits = self.search_entity(
-                    entity,  # type: ignore[arg-type]
-                    query,
-                    algorithm=algorithm,
-                    top_k=top_k,
-                )
-                return {
-                    "intent_used": entity,
-                    "hits": [h.to_dict() for h in hits],
-                }
-        # Caso geral: cai em tracks (cobre lyric, song, none).
-        if self.track_engine is None:
-            return {"intent_used": "none", "hits": []}
+        candidates: list[tuple[EntityKind, float, float, list[Any]]] = []
+
         track_algorithm: SearchAlgorithm = algorithm if algorithm in ("bm25", "tfidf") else "bm25"
-        track_hits = self.track_engine.search(query, algorithm=track_algorithm, top_k=top_k)
+        if self.track_engine is not None:
+            track_hits = self.track_engine.search(query, algorithm=track_algorithm, top_k=top_k)
+            if track_hits:
+                candidates.append(
+                    (
+                        "track",
+                        self._normalized_track_score(track_hits[0])
+                        + self._intent_bonus(normalized, "track"),
+                        track_hits[0].score,
+                        track_hits,
+                    )
+                )
+
+        for entity in ("album", "artist", "genre"):
+            idx = self.entity_indexes.get(entity)  # type: ignore[arg-type]
+            if idx is None:
+                continue
+            entity_hits = idx.search(query, algorithm=algorithm, top_k=top_k)
+            if not entity_hits:
+                continue
+            candidates.append(
+                (
+                    entity,
+                    self._normalized_entity_score(idx, entity_hits[0])
+                    + self._intent_bonus(normalized, entity),
+                    entity_hits[0].score,
+                    entity_hits,
+                )
+            )
+
+        if not candidates:
+            return {"intent_used": "none", "hits": []}
+
+        winner, _score, _raw, hits = max(
+            candidates,
+            key=lambda item: (
+                item[1],
+                item[2],
+                self._intent_bonus(normalized, item[0]),
+                self._kind_priority(item[0]),
+            ),
+        )
         return {
-            "intent_used": "track",
-            "hits": [h.to_dict() for h in track_hits],
+            "intent_used": winner,
+            "hits": [h.to_dict() for h in hits],
         }
+
+    def _normalized_track_score(self, hit: Any) -> float:
+        if self.track_engine is None:
+            return 0.0
+        total = sum(float(weight) for weight in self.track_engine.field_weights.values()) or 1.0
+        return float(hit.score) / total
+
+    def _normalized_entity_score(self, idx: EntityIndex, hit: EntityHit) -> float:
+        total = sum(float(weight) for weight in idx.field_weights.values()) or 1.0
+        return float(hit.score) / total
+
+    @staticmethod
+    def _intent_bonus(intent: str, kind: EntityKind) -> float:
+        if kind == "track" and intent in {"track", "song", "lyric"}:
+            return 0.12
+        if intent == kind:
+            return 0.12
+        return 0.0
+
+    @staticmethod
+    def _kind_priority(kind: EntityKind) -> int:
+        priorities: dict[EntityKind, int] = {
+            "album": 4,
+            "artist": 3,
+            "genre": 2,
+            "track": 1,
+            "composer": 0,
+        }
+        return priorities.get(kind, 0)

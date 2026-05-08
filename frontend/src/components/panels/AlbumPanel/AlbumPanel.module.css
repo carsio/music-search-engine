@@ -6,8 +6,9 @@
 
 .hero {
   display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 22px;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 24px;
+  align-items: stretch;
 }
 
 @media (max-width: 640px) {
@@ -23,21 +24,43 @@
   background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 50%, var(--bg)));
   display: flex;
   align-items: flex-end;
-  padding: 14px;
-  max-width: 200px;
+  padding: 18px;
+  min-height: 240px;
+  overflow: hidden;
+}
+
+.coverOverlay {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: white;
+  max-width: 20ch;
+}
+
+.coverArtist {
+  font-family: var(--mono);
+  font-size: 11px;
+  opacity: 0.74;
+  letter-spacing: 0.08em;
+}
+
+.coverTitle {
+  font-family: var(--serif);
+  font-size: 30px;
+  line-height: 0.95;
 }
 
 .coverYear {
   font-family: var(--mono);
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.85);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--ink);
+  opacity: 0.85;
 }
 
 .info {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .eyebrow {
@@ -62,6 +85,10 @@
   font-size: 14px;
   color: var(--ink-3);
   margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
 .artistLink {
@@ -69,6 +96,9 @@
   color: var(--ink);
   text-decoration: underline;
   cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .desc {
@@ -97,6 +127,157 @@
   font-family: var(--mono);
   font-size: 11px;
   color: var(--ink-4);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.sectionTitle {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 400;
+  margin: 0;
+}
+
+.sectionMeta {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.trackList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line-2);
+}
+
+.trackRow {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 8px;
+  border-bottom: 1px solid var(--line-3);
+  cursor: pointer;
+}
+
+.trackRow:hover {
+  background: color-mix(in oklab, var(--accent) 5%, var(--bg));
+}
+
+.trackNum,
+.trackDuration,
+.trackPlays {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.trackTitleWrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trackTitle {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.trackSub {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.trackFallback {
+  padding: 16px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-md);
+  color: var(--ink-3);
+  font-size: 14px;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sidebarCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.artistHero {
+  min-height: 140px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-2);
+  background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 30%, var(--bg)), var(--bg-2));
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+}
+
+.artistHeroLabel {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: white;
+}
+
+.artistName {
+  font-family: var(--serif);
+  font-size: 32px;
+  line-height: 0.98;
+  margin: 0;
+}
+
+.artistMeta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+.sidebarTagButton {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.artistCta {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--accent) 85%, white);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebarSectionTitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
 }
 
 .metaBox {
@@ -131,4 +312,14 @@
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ink);
+}
+
+@media (max-width: 740px) {
+  .trackRow {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+  }
+
+  .trackPlays {
+    display: none;
+  }
 }
