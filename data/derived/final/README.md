@@ -9,14 +9,17 @@ arquivos intermediarios e o Spotify Metadata bruto ficam fora daqui.
 | --- | ---: | --- |
 | `br_curated_tracks.parquet` | 50.000 | Tabela principal de faixas brasileiras curadas a partir do Spotify Metadata. Contem metadados estruturados, popularidade, album, artistas, generos, imagens, mercados, audio features e metadados de arquivo. |
 | `br_curated_lyrics.parquet` | 36.017 | Corpus de busca textual. E um recorte de `br_curated_tracks.parquet` apenas com faixas que possuem letra consolidada no cache de letras. |
-| `br_artists.parquet` | 0 | Dimensao de artistas enriquecida a partir da Wikipedia PT. Gerada por `scripts/export_entities.py` quando houver hits materializados em `enrichment_cache.sqlite`. |
-| `br_albums.parquet` | 0 | Dimensao de albuns enriquecida a partir da Wikipedia PT. |
-| `br_genres.parquet` | 0 | Dimensao de generos enriquecida a partir da Wikipedia PT. |
+| `br_artists.parquet` | 7.255 | Dimensao de artistas enriquecida a partir da Wikipedia PT. Gerada por `scripts/export_entities.py` a partir do materializado em `enrichment_cache.sqlite`. |
+| `br_albums.parquet` | 0 | Dimensao de albuns enriquecida a partir da Wikipedia PT. Ainda nao gerada no snapshot atual do manifesto. |
+| `br_genres.parquet` | 42 | Dimensao de generos enriquecida a partir da Wikipedia PT. |
 | `br_composers.parquet` | 0 | Dimensao de compositores/letristas enriquecida a partir da Wikipedia PT. |
 | `br_dataset_manifest.json` | - | Manifesto com versao do dataset, data de geracao, tamanho, hash SHA1 e contagem de registros por arquivo. |
 
-Os arquivos de entidade podem nao existir ainda. A aplicacao foi escrita para degradar
-graciosamente quando essas dimensoes ainda nao foram geradas.
+Snapshot atual do manifesto: versao `0.3.0`, gerado em `2026-05-08T13:00:52+00:00`.
+
+No snapshot atual, `br_artists.parquet` e `br_genres.parquet` ja estao versionados.
+`br_albums.parquet` e `br_composers.parquet` ainda podem nao existir. A aplicacao foi
+escrita para degradar graciosamente quando alguma dessas dimensoes ainda nao foi gerada.
 
 ## `br_curated_tracks.parquet`
 

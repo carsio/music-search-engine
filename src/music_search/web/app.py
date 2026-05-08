@@ -15,10 +15,12 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from music_search.multi_index import MultiEntityIndex
 from music_search.ranking import TfScheme
@@ -229,17 +231,17 @@ def _slim_track_payload(hit: dict[str, Any], payload: dict[str, Any]) -> dict[st
 
 
 @app.get("/healthz")
+@app.get("/api/healthz")
 def healthz() -> dict[str, Any]:
-    tracks = app.state.track_engine.num_docs if hasattr(app.state, "track_engine") else 0
-    entities = (
-        {k: v.num_docs for k, v in app.state.multi.entity_indexes.items()}
-        if hasattr(app.state, "multi")
-        else {}
-    )
+    track_engine = getattr(app.state, "track_engine", None)
+    tracks = int(getattr(track_engine, "num_docs", 0) or 0)
+    multi = getattr(app.state, "multi", None)
+    entity_indexes = getattr(multi, "entity_indexes", {}) or {}
+    entities = {k: v.num_docs for k, v in entity_indexes.items()}
     return {"ok": True, "tracks_indexed": tracks, "entities": entities, "llm": _NIM_AVAILABLE}
 
 
-@app.get("/search", response_model=SearchResponse)
+@app.get("/api/search", response_model=SearchResponse)
 async def search(
     q: Annotated[str, Query(min_length=1, max_length=200)],
     top: Annotated[int, Query(ge=1, le=50)] = 10,
@@ -315,7 +317,7 @@ async def search(
     )
 
 
-@app.get("/search/lyric", response_model=LyricSearchResponse)
+@app.get("/api/search/lyric", response_model=LyricSearchResponse)
 def search_lyric(
     q: Annotated[str, Query(min_length=1, max_length=200)],
     top: Annotated[int, Query(ge=1, le=50)] = 20,
@@ -357,7 +359,7 @@ def search_lyric(
     )
 
 
-@app.get("/artist/{artist_id}", response_model=ArtistResponse)
+@app.get("/api/artist/{artist_id}", response_model=ArtistResponse)
 def get_artist(artist_id: str) -> ArtistResponse:
     multi: MultiEntityIndex = app.state.multi
     idx = multi.entity_indexes.get("artist")
@@ -411,7 +413,7 @@ def get_artist(artist_id: str) -> ArtistResponse:
     )
 
 
-@app.get("/album/{album_id}", response_model=AlbumResponse)
+@app.get("/api/album/{album_id}", response_model=AlbumResponse)
 def get_album(album_id: str) -> AlbumResponse:
     multi: MultiEntityIndex = app.state.multi
     payload = multi.get_album(album_id)
@@ -420,7 +422,7 @@ def get_album(album_id: str) -> AlbumResponse:
     return _album_response_from_payload(payload)
 
 
-@app.get("/song/{song_id}", response_model=SongResponse)
+@app.get("/api/song/{song_id}", response_model=SongResponse)
 def get_song(song_id: str) -> SongResponse:
     engine: SparseSearchEngine = app.state.track_engine
     doc = engine.documents.get(song_id)
@@ -502,3 +504,55 @@ def _format_duration(ms: int) -> str | None:
         return None
     seconds = ms // 1000
     return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def _resolve_frontend_dist_dir() -> Path:
+    roots: list[Path] = []
+    configured_root = os.environ.get("MUSIC_SEARCH_REPO_ROOT")
+    if configured_root:
+        roots.append(Path(configured_root))
+    roots.extend([Path.cwd(), Path(__file__).resolve().parents[3]])
+
+    seen: set[Path] = set()
+    for root in roots:
+        resolved_root = root.resolve()
+        if resolved_root in seen:
+            continue
+        seen.add(resolved_root)
+        frontend_dist_dir = resolved_root / "frontend" / "dist"
+        if frontend_dist_dir.is_dir():
+            return frontend_dist_dir
+
+    return roots[0] / "frontend" / "dist"
+
+
+def _frontend_file_response(frontend_path: str = "") -> FileResponse:
+    frontend_dist_dir = _resolve_frontend_dist_dir()
+    if not frontend_dist_dir.is_dir():
+        raise HTTPException(404, "frontend build nao encontrado")
+
+    requested = (frontend_dist_dir / frontend_path).resolve()
+    try:
+        requested.relative_to(frontend_dist_dir)
+    except ValueError as exc:
+        raise HTTPException(404, "recurso de frontend invalido") from exc
+
+    if frontend_path and requested.is_file():
+        return FileResponse(requested)
+
+    index_file = frontend_dist_dir / "index.html"
+    if not index_file.is_file():
+        raise HTTPException(404, "frontend build nao encontrado")
+    return FileResponse(index_file)
+
+
+@app.get("/", include_in_schema=False)
+def serve_frontend_index() -> FileResponse:
+    return _frontend_file_response()
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_frontend_app(full_path: str) -> FileResponse:
+    if full_path.startswith("api/"):
+        raise HTTPException(404, "endpoint nao encontrado")
+    return _frontend_file_response(full_path)

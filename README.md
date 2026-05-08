@@ -10,9 +10,19 @@ Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFA
 
 O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, BM25) e a busca vetorial densa (embeddings + Milvus), e expõe esse motor através de uma API FastAPI consumida por um frontend React. Os dados foram curados a partir do Spotify Metadata e enriquecidos com letras (lyrics.ovh, Vagalume, letras.mus.br, Genius) e conteúdo da Wikipedia PT materializado de forma determinística para as entidades.
 
+O fluxo principal hoje é: a API em `music_search.web.app` recebe a query, classifica a intent via heurística ou LLM opcional, delega o roteamento para `multi_index.MultiEntityIndex`, consulta o índice esparso ou a dimensão apropriada e devolve a resposta para a SPA em `frontend/`.
+
+Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.json`, versão `0.3.0`, gerado em `2026-05-08`):
+
+- `br_curated_tracks.parquet`: 50.000 faixas brasileiras.
+- `br_curated_lyrics.parquet`: 36.017 faixas com letra consolidada.
+- `br_artists.parquet`: 7.255 artistas enriquecidos.
+- `br_genres.parquet`: 42 gêneros enriquecidos.
+- `br_albums.parquet` e `br_composers.parquet`: ainda opcionais no snapshot atual.
+
 ## Como o projeto está organizado
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │  Camada 1 — Core de RI (algoritmos do trabalho)                 │
 │  preprocessing → indexer → ranking (BM25, TF-IDF) → evaluation  │
@@ -21,7 +31,8 @@ O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, 
 ┌─────────────────────────────────────────────────────────────────┐
 │  Camada 2 — Motores de busca                                    │
 │  search.SparseSearchEngine   (multi-campo sobre tracks)         │
-│  multi_index.MultiEntityIndex (artist/album/genre/composer)     │
+│  multi_index.MultiEntityIndex (track/artist/album/genre/...)    │
+│  albums.py               (catálogo derivado para /album/{id})   │
 │  vector.VectorSearch         (embeddings + Milvus)              │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
@@ -102,6 +113,7 @@ uv run python -m music_search.ui_tk
 ### B) Rodar a busca vetorial
 
 Precisa de um backend de embedding:
+
 - **Ollama local** (padrão): `ollama pull nomic-embed-text && ollama serve`
 - **OpenAI**: `export OPENAI_API_KEY=... && export USE_OLLAMA=false`
 
@@ -127,18 +139,41 @@ uv run uvicorn music_search.web.app:app --reload --port 8000
 cd frontend && npm run dev
 ```
 
-Abrir <http://localhost:5173>. O proxy do Vite redireciona `/api/*` → `http://127.0.0.1:8000/*`.
+Abrir <http://localhost:5173>. O proxy do Vite encaminha `/api/*` → `http://127.0.0.1:8000/api/*`.
 
 Endpoints da API:
-- `GET /healthz` — status + contagens de docs
-- `GET /search?q=&top=10&algorithm=bm25` — busca roteada por intent (artist / album / genre / lyric / track)
-- `GET /search/lyric?q=&top=20` — busca dedicada em letras com snippets numerados
-- `GET /artist/{id}` — knowledge panel
-- `GET /song/{id}` — letra completa
 
-> **Sobre `multi_index`**: a API tenta carregar parquets de entidades (`data/derived/final/br_{artist,...}s.parquet`) na startup. Se não existirem ainda, a API ainda sobe — só não terá `MultiEntityIndex` populado e o roteamento de intent só vai retornar tracks. Veja a seção **Pipeline de dados** abaixo para gerar.
+- `GET /healthz` — status + contagens de docs (healthcheck do serviço)
+- `GET /api/healthz` — mesmo payload de saúde para clientes HTTP
+- `GET /api/search?q=&top=10&algorithm=bm25` — busca roteada por intent (artist / album / genre / lyric / track)
+- `GET /api/search/lyric?q=&top=20` — busca dedicada em letras com snippets numerados
+- `GET /api/artist/{id}` — knowledge panel
+- `GET /api/album/{id}` — página de álbum derivada do dataset curado
+- `GET /api/song/{id}` — letra completa
 
-### D) Rodar testes e checks de qualidade
+> **Sobre `multi_index`**: a API tenta carregar os parquets de entidades (`data/derived/final/br_{artist,...}s.parquet`) na startup. No snapshot versionado atual, `br_artists.parquet` (7.255 docs) e `br_genres.parquet` (42 docs) já carregam normalmente; `br_albums.parquet` e `br_composers.parquet` seguem opcionais. Mesmo sem alguma dimensão, a API continua subindo com fallback gracioso para tracks e catálogos derivados.
+
+### D) Rodar com Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Abrir <http://localhost:8000>. Nesse modo o frontend React é buildado dentro da imagem e servido pelo mesmo processo FastAPI; a API fica em `/api/*` e o volume nomeado `search-indexes` persiste `data/indexes/` entre reinícios.
+
+Para parar o stack:
+
+```bash
+docker compose down
+```
+
+Se quiser limpar também o índice persistido:
+
+```bash
+docker compose down -v
+```
+
+### E) Rodar testes e checks de qualidade
 
 ```bash
 uv run pytest                       # todos
@@ -154,13 +189,18 @@ uv run --extra vector --extra lyrics ty check
 
 ### Dataset definitivo versionado
 
-O dataset final fica separado em tabelas Parquet, para evitar repetir dados textuais grandes em cada faixa:
+O dataset final fica separado em tabelas Parquet para evitar repetir dados textuais grandes em cada faixa. Snapshot atual do manifesto:
 
-- `data/derived/final/br_curated_tracks.parquet`: tabela principal de 50.000 faixas brasileiras. É determinística e vem do Spotify Metadata original; inclui IDs, artistas, gêneros, álbum, label, popularidades, followers do artista primário, mercados disponíveis, audio features, metadados de arquivo e capas.
-- `data/derived/final/br_curated_lyrics.parquet`: corpus de busca com as faixas que já têm letra consolidada.
-- `data/derived/final/br_{artist,album,genre,composer}s.parquet`: dimensões enriquecidas a partir da Wikipedia PT, quando geradas.
-- `data/derived/final/br_dataset_manifest.json`: versão, contagens, tamanho e hash SHA1 dos arquivos.
-- `data/derived/final/README.md`: dicionário curto dos arquivos e dos principais grupos de colunas.
+| Artefato | Registros | Situação atual | Uso |
+| --- | ---: | --- | --- |
+| `data/derived/final/br_curated_tracks.parquet` | 50.000 | versionado | tabela principal de faixas brasileiras, com metadados estruturados do Spotify |
+| `data/derived/final/br_curated_lyrics.parquet` | 36.017 | versionado | corpus textual usado na indexação BM25/TF-IDF |
+| `data/derived/final/br_artists.parquet` | 7.255 | versionado | dimensão enriquecida de artistas via Wikipedia PT |
+| `data/derived/final/br_genres.parquet` | 42 | versionado | dimensão enriquecida de gêneros |
+| `data/derived/final/br_albums.parquet` | 0 | ainda não gerado no snapshot atual | dimensão enriquecida de álbuns |
+| `data/derived/final/br_composers.parquet` | 0 | ainda não gerado no snapshot atual | dimensão enriquecida de compositores/letristas |
+| `data/derived/final/br_dataset_manifest.json` | - | versionado | versão, contagens, tamanho e hash SHA1 dos arquivos |
+| `data/derived/final/README.md` | - | versionado | dicionário curto dos arquivos e dos principais grupos de colunas |
 
 Arquivos locais de cache (`*.sqlite`), Spotify bruto (`data/spotify-metadata/`) e exports intermediários continuam ignorados pelo Git.
 
@@ -210,6 +250,8 @@ br_curated_tracks.parquet
   → br_artists.parquet / br_albums.parquet / br_genres.parquet / br_composers.parquet
 ```
 
+No snapshot atual do repositório, `br_artists.parquet` e `br_genres.parquet` já estão versionados. `br_albums.parquet` e `br_composers.parquet` continuam sendo os próximos exports naturais desse pipeline.
+
 Os parquets resultantes preservam `source`, `source_url` e texto bruto limpo (`raw_text`) para indexacao leve. Campos ja estruturados do Spotify, como popularidade, followers, audio features, datas, label, mercados e capas, continuam fora desse enrichment e seguem vindo do pipeline deterministico principal.
 
 Para `genres`, o default agora usa seeds detalhadas derivadas de `artist_genres`; use `--seed-mode macro` para voltar à taxonomia curada de macro-gêneros.
@@ -243,51 +285,66 @@ painel de artefatos gerados (`br_*.parquet` e `br_dataset_manifest.json`).
 ./scripts/download_spotify_metadata.sh --full        # ~5.5 GB via Kaggle
 ```
 
-## Estrutura
+## Estrutura do repositório
 
-```
-src/music_search/
-├── preprocessing.py    # Tokenização, stemming
-├── indexer.py          # Índice invertido multi-campo
-├── ranking.py          # BM25, TF-IDF
-├── evaluation.py       # ⚠️ stub: métricas de RI ainda a implementar
-├── datasets.py         # Loaders Spotify + corpus curado
-├── search.py           # SparseSearchEngine (motor esparso de tracks) + CLI
-├── multi_index.py      # MultiEntityIndex (tracks + artist/album/genre/composer)
-├── ui_tk.py            # GUI Tk: compara BM25 x TF-IDF
-│
-├── vector/             # Busca densa (embeddings + Milvus)
-├── lyrics/             # Pipeline de extração de letras
-├── enrichment/         # Wikipedia text/API → materializacao local → entidades estruturadas
-├── llm/                # Cliente NIM opcional (intent / rerank)
-├── _async_http/        # http async reusável (cache + throttle + circuit breaker)
-└── web/
-    ├── app.py          # API FastAPI
-    ├── schemas.py      # Pydantic
-    └── snippets.py     # Extração de trechos de letra com highlight
+### Backend e núcleo de RI (`src/music_search/`)
 
-frontend/               # SPA React + Vite (consome /api/*)
-notebooks/              # 4 notebooks: EDA + curadoria do dataset BR
-scripts/                # build_curated_corpus, build_index, export_entities, ...
-data/derived/final/     # Datasets finais versionados + README do dataset
-data/derived/           # Caches e intermediarios locais (gitignored)
-data/spotify-metadata/  # Spotify raw (gitignored, baixado on-demand)
-```
+- `preprocessing.py`: tokenização, normalização, stopwords e stemming.
+- `indexer.py`: índice invertido multi-campo e estruturas auxiliares.
+- `ranking.py`: scoring compartilhado entre BM25 e TF-IDF.
+- `search.py`: `SparseSearchEngine`, CLI e carga do índice principal.
+- `multi_index.py`: busca roteada entre tracks, artists, albums, genres e composers.
+- `albums.py`: catálogo de álbuns derivado de `br_curated_tracks.parquet` para a rota `/album/{id}`.
+- `search_tuning.py`: perfis `balanced`, `lyrics` e `metadata` usados pelos motores.
+- `datasets.py`: loaders dos parquets curados e dos dados-base do projeto.
+- `evaluation.py`: reservado para métricas de RI e golden set.
+
+### Serviços Python e interfaces (`src/music_search/`)
+
+- `web/`: FastAPI (`app.py`), schemas Pydantic e extração de snippets.
+- `vector/`: indexação de embeddings, busca vetorial e UI Tk dedicada.
+- `lyrics/`: coleta de letras, estatísticas e consolidação do corpus.
+- `enrichment/`: seeds, coleta da Wikipedia PT, materialização local e UI Tk do pipeline.
+- `llm/`: cliente NIM e tarefas opcionais de intent/rerank.
+- `_async_http/`: cache SQLite, throttle, retries e circuit breaker compartilhados.
+- `ui_tk.py`: interface desktop para comparar BM25 x TF-IDF.
+
+### Frontend (`frontend/src/`)
+
+- `api/`: cliente HTTP, tipos e contratos consumidos da API.
+- `hooks/`: fluxo de busca, debounce, query params e preferências da UI.
+- `components/`: blocos reutilizáveis organizados em `home`, `layout`, `panels`, `primitives`, `search` e `states`.
+- `views/`: composição das telas principais.
+- `styles/`: tokens, reset, animações e estilos globais.
+- `utils/`: highlight, intent, formatação e helpers gerais.
+
+### Dados, automação e suporte
+
+- `data/derived/final/`: snapshot versionado do dataset final e manifesto.
+- `data/derived/`: caches e intermediários locais não versionados.
+- `data/spotify-metadata/`: fonte bruta opcional para recurar o dataset.
+- `scripts/`: geração offline de tracks, corpus, índices, exports e manifesto.
+- `tests/`: suíte por subsistema (`search`, `multi_index`, `web`, `lyrics`, `vector`, etc.).
+- `notebooks/`: EDA e curadoria do dataset brasileiro.
+- `.vscode/`: atalhos de debug e tasks para backend, frontend e full stack.
+- `.github/workflows/`: CI e deploy dos slides.
+- `reference-web/`: protótipos e referências de UI.
+- `slides/`: apresentação publicada do projeto.
+- `docs/`: documentação auxiliar.
 
 ## Atalhos no VSCode
 
-`launch.json` tem configs prontas (F5 → escolher):
+`launch.json` hoje expõe:
 
-- **Sparse: CLI search** / **Sparse: GUI Tk**
-- **Vector: CLI search** / **Vector: indexar** / **Vector: GUI Tk**
-- **Web: API (uvicorn reload)**
-- **Full-stack** (compound: API + Vite juntos)
-- **Lyrics: probe / fetch / stats**
-- **Enrichment: artists / albums**
-- **Build: corpus / index / dataset completo**
-- **Pytest: arquivo atual** / **Pytest: todos**
+- `Backend · FastAPI (uvicorn)`
+- `Frontend · Vite (npm run dev)`
+- `Full stack (backend + frontend)`
 
-`tasks.json` tem `npm: dev` / `npm: build` para o frontend e `uv: sync` para deps.
+`tasks.json` hoje expõe:
+
+- `backend: dev`
+- `frontend: dev`
+- `dev: full stack`
 
 ## Status — feito vs falta
 
@@ -295,25 +352,28 @@ data/spotify-metadata/  # Spotify raw (gitignored, baixado on-demand)
 
 - Pipeline RI clássico: preprocessing, índice invertido multi-campo, BM25, TF-IDF
 - Motor esparso multi-campo com pesos configuráveis (`SparseSearchEngine`)
+- Roteamento via `MultiEntityIndex` com fallback gracioso quando alguma dimensão ainda não existe
 - Busca vetorial com Ollama/OpenAI + Milvus Lite
 - GUI Tk comparativa (sparse e vector)
-- Dataset curado de **50.000 faixas brasileiras** com metadados enriquecidos e **36.017 músicas com letra** versionadas
+- Catálogo de álbuns derivado do dataset de tracks e endpoint `/album/{id}`
+- Dataset versionado com **50.000 faixas brasileiras**, **36.017 músicas com letra**, **7.255 artistas** e **42 gêneros**
 - Pipeline de letras com cache, retries, circuit breaker e cascata de fontes
-- API FastAPI com endpoints `/search`, `/search/lyric`, `/artist`, `/song`
+- Pipeline de enrichment determinístico da Wikipedia PT já exportando artistas e gêneros
+- API FastAPI com endpoints `/search`, `/search/lyric`, `/artist`, `/album`, `/song`
 - Frontend React+Vite com painéis de artista/música/lyric matches
+- CI em `.github/workflows/ci.yml` para lint, format check, type check e pytest
 - Suíte de testes (preprocessing, indexer, ranking, search, vector, lyrics)
 
 ### 🟡 Em andamento
 
-- **Enrichment de entidades** (`enrichment/`): pipeline agora materializa dados da Wikipedia sem depender de LLM, mas os parquets `br_{artist,album,genre,composer}s.parquet` ainda precisam ser gerados/commitados. A API roda sem eles, mas `/artist/{id}` cai num fallback derivado dos tracks.
-- **MultiEntityIndex** depende dos parquets acima; está integrado mas só populado parcialmente.
-- **Frontend**: estrutura e rotas montadas; alguns painéis mockados aguardam dados de enrichment.
+- **Álbuns e compositores enriquecidos**: `br_albums.parquet` e `br_composers.parquet` ainda não entram no snapshot versionado atual.
+- **Cobertura do `MultiEntityIndex`**: artist e genre já carregam do manifesto atual, mas album/composer ainda dependem dos exports restantes.
+- **Avaliação de qualidade**: rerank por LLM e os perfis de busca ainda precisam de medição comparativa controlada.
 
 ### ❌ Falta
 
 - **`evaluation.py`** está vazio (só docstring). Precisa implementar Precision, Recall, MAP e nDCG e construir um conjunto de queries com julgamento (golden set) para comparar BM25 × TF-IDF × vetorial.
-- **Reranking por LLM**: `web/app.py` já tem o gancho (`?rerank=true`), mas só ativa se `NIM_API_KEY` estiver setada. Falta avaliar impacto.
-- **CI**: não há workflow ainda no `.github/workflows/` para rodar lint+ty+pytest em PRs (havia um antes, conferir se ainda está ativo).
+- **Benchmarking consolidado**: falta fechar uma comparação reproduzível entre sparse, vetorial e rerank.
 
 ## Equipe
 

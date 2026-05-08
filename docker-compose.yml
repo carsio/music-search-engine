@@ -1,0 +1,24 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      NIM_API_KEY: ${NIM_API_KEY:-}
+      NIM_BASE_URL: ${NIM_BASE_URL:-}
+      NIM_RATE: ${NIM_RATE:-1.0}
+      NIM_MAX_RETRIES: ${NIM_MAX_RETRIES:-4}
+    volumes:
+      - search-indexes:/app/data/indexes
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  search-indexes:

@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from music_search.albums import AlbumDocument
 from music_search.multi_index import EntityIndex, MultiEntityIndex
-from music_search.web.app import _album_response_from_payload, app, get_album, search, search_lyric
+from music_search.web.app import (
+    _album_response_from_payload,
+    app,
+    get_album,
+    search,
+    search_lyric,
+    serve_frontend_app,
+)
 
 
 class _TrackEngineStub:
@@ -225,3 +234,27 @@ def test_search_lyric_respeita_max_snippets_e_parametros_avancados() -> None:
         "bm25_b": 0.3,
         "tf_scheme": "augmented",
     }
+
+
+def test_healthz_exposto_em_api_prefix_sem_lifespan() -> None:
+    client = TestClient(app)
+
+    response = client.get("/api/healthz")
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+
+def test_spa_fallback_serves_asset_e_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    dist_dir = tmp_path / "dist"
+    assets_dir = dist_dir / "assets"
+    assets_dir.mkdir(parents=True)
+    (dist_dir / "index.html").write_text("<html><body>spa-shell</body></html>", encoding="utf-8")
+    (assets_dir / "app.js").write_text("console.log('bundle');", encoding="utf-8")
+    monkeypatch.setattr("music_search.web.app._resolve_frontend_dist_dir", lambda: dist_dir)
+
+    asset_response = serve_frontend_app("assets/app.js")
+    page_response = serve_frontend_app("artist/gilberto-gil")
+
+    assert Path(asset_response.path).name == "app.js"
+    assert Path(page_response.path).name == "index.html"
