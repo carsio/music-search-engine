@@ -4,7 +4,7 @@ from pathlib import Path
 
 import duckdb
 
-from music_search.albums import build_album_search_records, load_album_catalog_from_tracks
+from music_search.data.albums import build_album_search_records, load_album_catalog_from_tracks
 
 
 def _write_tracks_parquet(path: Path) -> None:

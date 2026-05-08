@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from music_search.indexer import IndexBuilder, InvertedIndex, build_index
+from music_search.core.indexer import IndexBuilder, InvertedIndex, build_index
 
 DOCS = [
     {"id": "t1", "title": "As Canções de Amor", "artist": "Roberto Carlos", "album": "Emoções"},

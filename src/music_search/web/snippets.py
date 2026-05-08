@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-from music_search.preprocessing import preprocess
+from music_search.core.preprocessing import preprocess
 
 
 def query_terms(query: str) -> set[str]:

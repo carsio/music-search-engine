@@ -29,8 +29,8 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Literal
 
-from music_search.indexer import InvertedIndex
-from music_search.preprocessing import preprocess
+from music_search.core.indexer import InvertedIndex
+from music_search.core.preprocessing import preprocess
 
 TfScheme = Literal["raw", "log", "augmented"]
 _SCHEMES: tuple[TfScheme, ...] = ("raw", "log", "augmented")

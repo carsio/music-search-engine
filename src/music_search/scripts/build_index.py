@@ -1,9 +1,9 @@
 """Constrói o índice invertido e persiste em disco.
 
 Uso:
-    uv run python scripts/build_index.py
-    uv run python scripts/build_index.py --dataset spotify
-    uv run python scripts/build_index.py --limit 1000
+    uv run python -m music_search.scripts.build_index
+    uv run python -m music_search.scripts.build_index --dataset spotify
+    uv run python -m music_search.scripts.build_index --limit 1000
 """
 
 from __future__ import annotations
@@ -12,7 +12,8 @@ import argparse
 import time
 from pathlib import Path
 
-from music_search.datasets import (
+from music_search.core.indexer import IndexBuilder
+from music_search.data.datasets import (
     CURATED_FIELDS,
     DEFAULT_CURATED_CORPUS_PATH,
     DEFAULT_PARQUET_DIR,
@@ -20,8 +21,7 @@ from music_search.datasets import (
     BrazilianLyricsLoader,
     SpotifyTracksLoader,
 )
-from music_search.indexer import IndexBuilder
-from music_search.search import DEFAULT_INDEX_PATH
+from music_search.motors.search import DEFAULT_INDEX_PATH
 
 DEFAULT_SPOTIFY_OUTPUT = Path("data/indexes/spotify.pkl")
 DATASET_CHOICES = ("curated-br", "spotify")

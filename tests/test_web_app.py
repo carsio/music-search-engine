@@ -7,8 +7,8 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from music_search.albums import AlbumDocument
-from music_search.multi_index import EntityIndex, MultiEntityIndex
+from music_search.data.albums import AlbumDocument
+from music_search.motors.multi_index import EntityIndex, MultiEntityIndex
 from music_search.web.app import (
     _album_response_from_payload,
     app,

@@ -13,7 +13,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Literal
 
-from music_search.search import (
+from music_search.motors.search import (
     DEFAULT_FIELD_WEIGHTS,
     FIELD_LABELS,
     SearchAlgorithm,

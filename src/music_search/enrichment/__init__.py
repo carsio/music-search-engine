@@ -5,7 +5,7 @@ Pipeline em duas etapas:
 2. **LLM** extrai um JSON estruturado (schema em `music_search.llm.prompts`).
 
 Resultado vai para `data/derived/enrichment_cache.sqlite` (KeyValueCache).
-Depois, `scripts/export_entities.py` consolida o cache em parquets versionados.
+Depois, ``music_search.scripts.export_entities`` consolida o cache em parquets versionados.
 """
 
 from music_search.enrichment.models import (

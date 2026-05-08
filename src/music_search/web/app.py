@@ -22,10 +22,10 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from music_search.multi_index import MultiEntityIndex
-from music_search.ranking import TfScheme
-from music_search.search import SparseSearchEngine, load_or_build_default_engine
-from music_search.search_tuning import SearchProfile
+from music_search.core.ranking import TfScheme
+from music_search.motors.multi_index import MultiEntityIndex
+from music_search.motors.search import SparseSearchEngine, load_or_build_default_engine
+from music_search.motors.tuning import SearchProfile
 from music_search.web.schemas import (
     AlbumArtistSummary,
     AlbumRef,

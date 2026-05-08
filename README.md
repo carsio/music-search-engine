@@ -6,6 +6,11 @@ Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFA
 
 📊 Slides: <https://carsio.github.io/music-search-engine/>
 
+> 📖 Para entender o sistema do começo ao fim — conceitos de RI, pipeline de
+> dados, BM25/TF-IDF (com fórmulas), motores, intent, LLM e o trajeto de uma
+> query — comece por **[`docs/GUIA.md`](docs/GUIA.md)**. Este README é
+> referência rápida de comandos.
+
 ## Visão geral
 
 O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, BM25) e a busca vetorial densa (embeddings + Milvus), e expõe esse motor através de uma API FastAPI consumida por um frontend React. Os dados foram curados a partir do Spotify Metadata e enriquecidos com letras (lyrics.ovh, Vagalume, letras.mus.br, Genius) e conteúdo da Wikipedia PT materializado de forma determinística para as entidades.
@@ -24,15 +29,15 @@ Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.js
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│  Camada 1 — Core de RI (algoritmos do trabalho)                 │
+│  Camada 1 — Core de RI (algoritmos do trabalho)  [core/]        │
 │  preprocessing → indexer → ranking (BM25, TF-IDF) → evaluation  │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
-│  Camada 2 — Motores de busca                                    │
-│  search.SparseSearchEngine   (multi-campo sobre tracks)         │
-│  multi_index.MultiEntityIndex (track/artist/album/genre/...)    │
-│  albums.py               (catálogo derivado para /album/{id})   │
+│  Camada 2 — Motores de busca  [motors/, data/, vector/]         │
+│  motors.search.SparseSearchEngine   (multi-campo sobre tracks)  │
+│  motors.multi_index.MultiEntityIndex (track/artist/album/...)   │
+│  data.albums              (catálogo derivado para /album/{id})  │
 │  vector.VectorSearch         (embeddings + Milvus)              │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
@@ -52,13 +57,13 @@ Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.js
 │  lyrics/  (cascata: letras.mus.br → vagalume → lyrics.ovh →     │
 │            genius, com cache SQLite e circuit breaker)          │
 │         ↓                                                       │
-│  scripts/build_curated_corpus.py                                │
+│  python -m music_search.scripts.build_curated_corpus            │
 │         ↓                                                       │
 │  data/derived/final/br_curated_lyrics.parquet ← CORPUS PRINCIPAL│
 │                                                                 │
 │  enrichment/ (Wikipedia PT text/API → materializacao local)     │
 │         ↓                                                       │
-│  scripts/export_entities.py                                     │
+│  python -m music_search.scripts.export_entities                 │
 │         ↓                                                       │
 │  data/derived/final/br_{artist,album,genre,composer}s.parquet   │
 │                                                                 │
@@ -102,7 +107,7 @@ $env:NIM_MAX_RETRIES="4"     # retries automaticos no cliente NIM
 
 ```bash
 # CLI
-uv run python -m music_search.search "amor saudade" --algorithm both --top 5
+uv run python -m music_search.motors.search "amor saudade" --algorithm both --top 5
 
 # GUI Tkinter (compara BM25 x TF-IDF lado a lado)
 uv run python -m music_search.ui_tk
@@ -207,7 +212,7 @@ Arquivos locais de cache (`*.sqlite`), Spotify bruto (`data/spotify-metadata/`) 
 Para reconstruir a tabela principal de tracks:
 
 ```powershell
-uv run python scripts/expand_dataset.py --output data/derived/final/br_curated_tracks.parquet
+uv run python -m music_search.scripts.expand_dataset --output data/derived/final/br_curated_tracks.parquet
 ```
 
 Esse passo também puxa os links de capas já existentes no Spotify Metadata. As colunas são `album_image_url`, `album_image_width`, `album_image_height`, além de `primary_artist_image_url`, `primary_artist_image_width`, `primary_artist_image_height`.
@@ -231,7 +236,7 @@ uv run python -m music_search.lyrics fetch --limit 100 --concurrency 8
 uv run python -m music_search.lyrics stats
 
 # Consolidar tracks + letras em parquet
-uv run python scripts/build_curated_corpus.py
+uv run python -m music_search.scripts.build_curated_corpus
 ```
 
 Variáveis opcionais: `VAGALUME_API_KEY`, `GENIUS_TOKEN`. Sem elas, ainda funciona via letras.mus.br + lyrics.ovh.
@@ -246,7 +251,7 @@ br_curated_tracks.parquet
   → WikipediaPTSource baixa texto (Wikipedia-API; fallback HTML)
   → materializacao local transforma texto em payload pesquisavel
   → data/derived/enrichment_cache.sqlite
-  → scripts/export_entities.py
+  → python -m music_search.scripts.export_entities
   → br_artists.parquet / br_albums.parquet / br_genres.parquet / br_composers.parquet
 ```
 
@@ -265,10 +270,10 @@ uv run python -m music_search.enrichment genres --concurrency 4 --seed-mode macr
 uv run python -m music_search.enrichment composers --limit 500 --concurrency 4
 
 # Cache → parquets
-uv run python scripts/export_entities.py
+uv run python -m music_search.scripts.export_entities
 
 # Manifest final, sem reprocessar letras
-uv run python scripts/build_dataset.py --skip-lyrics
+uv run python -m music_search.scripts.build_dataset --skip-lyrics
 
 # UI Tk para rodar o mesmo fluxo em batches manuais
 uv run python -m music_search.enrichment.ui_tk
@@ -281,23 +286,36 @@ painel de artefatos gerados (`br_*.parquet` e `br_dataset_manifest.json`).
 ### Spotify raw (apenas se for re-curar)
 
 ```bash
-./scripts/download_spotify_metadata.sh --truncated   # ~344 MB (default)
-./scripts/download_spotify_metadata.sh --full        # ~5.5 GB via Kaggle
+./src/music_search/scripts/download_spotify_metadata.sh --truncated   # ~344 MB (default)
+./src/music_search/scripts/download_spotify_metadata.sh --full        # ~5.5 GB via Kaggle
 ```
 
 ## Estrutura do repositório
 
-### Backend e núcleo de RI (`src/music_search/`)
+### Núcleo de RI (`src/music_search/core/`)
 
 - `preprocessing.py`: tokenização, normalização, stopwords e stemming.
 - `indexer.py`: índice invertido multi-campo e estruturas auxiliares.
 - `ranking.py`: scoring compartilhado entre BM25 e TF-IDF.
+- `evaluation.py`: reservado para métricas de RI e golden set.
+
+### Motores de busca (`src/music_search/motors/`)
+
 - `search.py`: `SparseSearchEngine`, CLI e carga do índice principal.
 - `multi_index.py`: busca roteada entre tracks, artists, albums, genres e composers.
-- `albums.py`: catálogo de álbuns derivado de `br_curated_tracks.parquet` para a rota `/album/{id}`.
-- `search_tuning.py`: perfis `balanced`, `lyrics` e `metadata` usados pelos motores.
+- `tuning.py`: perfis `balanced`, `lyrics` e `metadata` usados pelos motores.
+
+### Datasets e loaders (`src/music_search/data/`)
+
 - `datasets.py`: loaders dos parquets curados e dos dados-base do projeto.
-- `evaluation.py`: reservado para métricas de RI e golden set.
+- `albums.py`: catálogo de álbuns derivado de `br_curated_tracks.parquet` para a rota `/album/{id}`.
+
+### Pipelines de build (`src/music_search/scripts/`)
+
+- `build_curated_corpus.py`, `build_dataset.py`, `build_index.py`,
+  `build_entity_indexes.py`, `expand_dataset.py`, `export_entities.py`,
+  `download_spotify_metadata.sh`. Todos rodáveis via
+  `python -m music_search.scripts.<nome>`.
 
 ### Serviços Python e interfaces (`src/music_search/`)
 
@@ -323,14 +341,14 @@ painel de artefatos gerados (`br_*.parquet` e `br_dataset_manifest.json`).
 - `data/derived/final/`: snapshot versionado do dataset final e manifesto.
 - `data/derived/`: caches e intermediários locais não versionados.
 - `data/spotify-metadata/`: fonte bruta opcional para recurar o dataset.
-- `scripts/`: geração offline de tracks, corpus, índices, exports e manifesto.
+- `src/music_search/scripts/`: geração offline de tracks, corpus, índices, exports e manifesto.
 - `tests/`: suíte por subsistema (`search`, `multi_index`, `web`, `lyrics`, `vector`, etc.).
 - `notebooks/`: EDA e curadoria do dataset brasileiro.
 - `.vscode/`: atalhos de debug e tasks para backend, frontend e full stack.
 - `.github/workflows/`: CI e deploy dos slides.
 - `reference-web/`: protótipos e referências de UI.
 - `slides/`: apresentação publicada do projeto.
-- `docs/`: documentação auxiliar.
+- `docs/`: guia didático completo (`GUIA.md`) e documentação auxiliar.
 
 ## Atalhos no VSCode
 

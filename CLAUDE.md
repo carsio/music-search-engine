@@ -8,34 +8,37 @@ Sistema de busca de músicas brasileiras (BM25, TF-IDF, vetorial) construído so
 
 ## Arquitetura em camadas
 
-1. **Core RI** (`preprocessing`, `indexer`, `ranking`, `evaluation`) — algoritmos puros do trabalho.
-2. **Motores** (`search`, `multi_index`, `vector`) — abstrações que aplicam o core sobre o corpus curado.
-3. **Apresentação** (`ui_tk`, `vector/ui_tk`, `web/app` + `frontend/`) — interfaces.
-4. **Pipeline de dados** (`lyrics`, `enrichment`, `llm`, `_async_http`, `scripts/`) — gera os parquets versionados em `data/derived/final/`. Não roda no caminho crítico de uma busca; só quando se quer regenerar dados.
+1. **Core RI** (`core/preprocessing`, `core/indexer`, `core/ranking`, `core/evaluation`) — algoritmos puros do trabalho.
+2. **Motores** (`motors/search`, `motors/multi_index`, `motors/tuning`, `vector/`) — abstrações que aplicam o core sobre o corpus curado.
+3. **Datasets** (`data/datasets`, `data/albums`) — loaders e estruturas tipadas dos parquets curados.
+4. **Apresentação** (`ui_tk`, `vector/ui_tk`, `web/app` + `frontend/`) — interfaces.
+5. **Pipeline de dados** (`lyrics`, `enrichment`, `llm`, `_async_http`, `scripts/`, todos em `src/music_search/`) — gera os parquets versionados em `data/derived/final/`. Não roda no caminho crítico de uma busca; só quando se quer regenerar dados.
+
+Para um guia gradual de cada peça (com fórmulas de BM25/TF-IDF e o trajeto ponta a ponta de uma query), ver `docs/GUIA.md`.
 
 Fluxo runtime de uma query na API:
 
 ```
 HTTP /search?q=… → web/app classifica intent (LLM ou heurística)
-                 → multi_index.search_routed() escolhe SparseSearchEngine ou EntityIndex
-                 → SparseSearchEngine usa indexer + ranking sobre br_curated_lyrics.parquet
-                 → snippets.extract_snippets() recorta letra (quando intent=lyric)
+                 → motors.multi_index.search_routed() escolhe SparseSearchEngine ou EntityIndex
+                 → SparseSearchEngine usa core.indexer + core.ranking sobre br_curated_lyrics.parquet
+                 → web.snippets.extract_snippets() recorta letra (quando intent=lyric)
                  → opcional: llm.tasks.rerank()
 ```
 
 ## Comandos essenciais
 
 ```bash
-uv sync --all-groups --extra vector --extra lyrics  # setup
-uv run pytest                                        # testes
-uv run ruff check . && uv run ruff format --check .  # lint+format
-uv run --extra vector --extra lyrics ty check        # tipos
-uv run python -m music_search.search "amor saudade" # smoke esparso
-uv run uvicorn music_search.web.app:app --reload    # API
-cd frontend && npm run dev                           # frontend
+uv sync --all-groups --extra vector --extra lyrics       # setup
+uv run pytest                                             # testes
+uv run ruff check . && uv run ruff format --check .       # lint+format
+uv run --extra vector --extra lyrics ty check             # tipos
+uv run python -m music_search.motors.search "amor saudade" # smoke esparso
+uv run uvicorn music_search.web.app:app --reload          # API
+cd frontend && npm run dev                                 # frontend
 ```
 
-Comandos por subsistema (lyrics fetch, enrichment, vector indexing, build_curated_corpus, ...) estão no `README.md`.
+Comandos por subsistema (lyrics fetch, enrichment, vector indexing, `python -m music_search.scripts.build_curated_corpus`, ...) estão no `README.md`.
 
 ## Convenções
 
@@ -47,11 +50,12 @@ Comandos por subsistema (lyrics fetch, enrichment, vector indexing, build_curate
 
 ## Pontos de atenção ao editar
 
-- **Não duplicar lógica de scoring**: `search.py` e `multi_index.py` reusam `BM25` e `TFIDF` de `ranking.py`. Mudanças de scoring devem ir no core.
+- **Não duplicar lógica de scoring**: `motors/search.py` e `motors/multi_index.py` reusam `BM25` e `TFIDF` de `core/ranking.py`. Mudanças de scoring devem ir no core.
 - **Async + cache**: `lyrics` e `enrichment` compartilham infra em `_async_http/` (cache SQLite, token bucket, circuit breaker). Novas fontes devem implementar o protocolo em `sources/base.py`.
 - **LLM é opcional**: `web/app.py` e `enrichment/pipeline.py` checam `NIM_API_KEY` e caem em fallbacks heurísticos quando ausente. Não introduzir dependência dura.
 - **CORS do frontend**: o Vite dev server roda em `:5173` e o proxy reescreve `/api` → `http://127.0.0.1:8000`. CORS está liberado só para essa origem.
-- **`evaluation.py` está vazio** — quando for implementar métricas (Precision, Recall, MAP, nDCG), criar fixtures de golden set em `tests/data/`.
+- **Scripts dentro do pacote**: builds rodam via `python -m music_search.scripts.<nome>`. A pasta `scripts/` da raiz não existe mais — o `download_spotify_metadata.sh` mora em `src/music_search/scripts/`.
+- **`core/evaluation.py` está vazio** — quando for implementar métricas (Precision, Recall, MAP, nDCG), criar fixtures de golden set em `tests/data/`.
 
 ## Setup após clonar (resumo)
 

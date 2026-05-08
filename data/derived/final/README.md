@@ -9,7 +9,7 @@ arquivos intermediarios e o Spotify Metadata bruto ficam fora daqui.
 | --- | ---: | --- |
 | `br_curated_tracks.parquet` | 50.000 | Tabela principal de faixas brasileiras curadas a partir do Spotify Metadata. Contem metadados estruturados, popularidade, album, artistas, generos, imagens, mercados, audio features e metadados de arquivo. |
 | `br_curated_lyrics.parquet` | 36.017 | Corpus de busca textual. E um recorte de `br_curated_tracks.parquet` apenas com faixas que possuem letra consolidada no cache de letras. |
-| `br_artists.parquet` | 7.255 | Dimensao de artistas enriquecida a partir da Wikipedia PT. Gerada por `scripts/export_entities.py` a partir do materializado em `enrichment_cache.sqlite`. |
+| `br_artists.parquet` | 7.255 | Dimensao de artistas enriquecida a partir da Wikipedia PT. Gerada por `python -m music_search.scripts.export_entities` a partir do materializado em `enrichment_cache.sqlite`. |
 | `br_albums.parquet` | 0 | Dimensao de albuns enriquecida a partir da Wikipedia PT. Ainda nao gerada no snapshot atual do manifesto. |
 | `br_genres.parquet` | 42 | Dimensao de generos enriquecida a partir da Wikipedia PT. |
 | `br_composers.parquet` | 0 | Dimensao de compositores/letristas enriquecida a partir da Wikipedia PT. |
@@ -57,7 +57,7 @@ Cobertura atual:
 Grao: uma linha por faixa com letra consolidada.
 
 Origem: join entre `br_curated_tracks.parquet` e o cache local de letras
-(`data/derived/lyrics_cache.sqlite`), via `scripts/build_curated_corpus.py`.
+(`data/derived/lyrics_cache.sqlite`), via `python -m music_search.scripts.build_curated_corpus`.
 
 Colunas principais:
 
@@ -83,8 +83,8 @@ uv run python -m music_search.enrichment albums --limit 500 --concurrency 4
 uv run python -m music_search.enrichment genres --concurrency 4
 uv run python -m music_search.enrichment genres --concurrency 4 --seed-mode macro
 uv run python -m music_search.enrichment composers --limit 500 --concurrency 4
-uv run python scripts/export_entities.py
-uv run python scripts/build_dataset.py --skip-lyrics
+uv run python -m music_search.scripts.export_entities
+uv run python -m music_search.scripts.build_dataset --skip-lyrics
 
 # UI Tk para rodar esse fluxo manualmente
 uv run python -m music_search.enrichment.ui_tk
@@ -100,13 +100,13 @@ Campos ja estruturados no Spotify, como popularidade, seguidores, imagens, datas
 
 ```powershell
 # Recria a tabela principal de tracks.
-uv run python scripts/expand_dataset.py
+uv run python -m music_search.scripts.expand_dataset
 
 # Consolida letras ja existentes no cache.
-uv run python scripts/build_curated_corpus.py
+uv run python -m music_search.scripts.build_curated_corpus
 
 # Atualiza manifest e exporta entidades ja enriquecidas.
-uv run python scripts/build_dataset.py --skip-lyrics
+uv run python -m music_search.scripts.build_dataset --skip-lyrics
 ```
 
 Para versionar somente o dataset final:

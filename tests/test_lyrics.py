@@ -21,7 +21,7 @@ def test_slugify_normalizes_accents() -> None:
 
 
 def test_browser_headers_do_not_force_brotli() -> None:
-    from music_search.lyrics.user_agents import random_browser_headers
+    from music_search._async_http.user_agents import random_browser_headers
 
     headers = random_browser_headers()
 

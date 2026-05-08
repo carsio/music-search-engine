@@ -38,19 +38,19 @@ nltk: ## Download required NLTK data
 download: download-truncated ## Download the truncated Spotify dataset
 
 download-truncated: ## Download the truncated Spotify dataset
-	./scripts/download_spotify_metadata.sh --truncated
+	./src/music_search/scripts/download_spotify_metadata.sh --truncated
 
 download-full: ## Download the full Spotify dataset via Kaggle
-	./scripts/download_spotify_metadata.sh --full
+	./src/music_search/scripts/download_spotify_metadata.sh --full
 
 corpus: ## Rebuild the curated corpus parquet
-	uv run python scripts/build_curated_corpus.py
+	uv run python -m music_search.scripts.build_curated_corpus
 
 index: ## Build the sparse index for the default corpus
-	uv run python scripts/build_index.py
+	uv run python -m music_search.scripts.build_index
 
 search: ## Run sparse CLI search (use SEARCH_QUERY/SEARCH_TOP/SEARCH_ALGORITHM)
-	uv run python -m music_search.search "$(SEARCH_QUERY)" --algorithm $(SEARCH_ALGORITHM) --top $(SEARCH_TOP)
+	uv run python -m music_search.motors.search "$(SEARCH_QUERY)" --algorithm $(SEARCH_ALGORITHM) --top $(SEARCH_TOP)
 
 ui: ## Open the sparse Tkinter UI
 	uv run python -m music_search.ui_tk

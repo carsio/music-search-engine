@@ -6,8 +6,8 @@ Uso:
 Fluxo coberto pela UI:
 1. baixar documentos relacionados
 2. normalizar com LLM
-3. scripts/export_entities.py
-4. scripts/build_dataset.py --skip-lyrics
+3. music_search.scripts.export_entities
+4. music_search.scripts.build_dataset --skip-lyrics
 """
 
 from __future__ import annotations
@@ -187,12 +187,12 @@ class EnrichmentApp(tk.Tk):
         self._build_dataset_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             frame,
-            text="Rodar scripts/export_entities.py (apos normalizacao)",
+            text="Rodar music_search.scripts.export_entities (apos normalizacao)",
             variable=self._export_var,
         ).grid(row=2, column=0, columnspan=4, sticky="w", pady=(8, 0))
         ttk.Checkbutton(
             frame,
-            text="Rodar scripts/build_dataset.py --skip-lyrics (apos normalizacao)",
+            text="Rodar music_search.scripts.build_dataset --skip-lyrics (apos normalizacao)",
             variable=self._build_dataset_var,
         ).grid(row=3, column=0, columnspan=4, sticky="w")
 
@@ -625,7 +625,7 @@ class EnrichmentApp(tk.Tk):
     def _stage_export(self) -> _Stage:
         return _Stage(
             label="export entities",
-            argv=[sys.executable, str(self._project_root / "scripts" / "export_entities.py")],
+            argv=[sys.executable, "-m", "music_search.scripts.export_entities"],
         )
 
     def _stage_build_dataset(self) -> _Stage:
@@ -633,7 +633,8 @@ class EnrichmentApp(tk.Tk):
             label="build dataset (--skip-lyrics)",
             argv=[
                 sys.executable,
-                str(self._project_root / "scripts" / "build_dataset.py"),
+                "-m",
+                "music_search.scripts.build_dataset",
                 "--skip-lyrics",
             ],
         )

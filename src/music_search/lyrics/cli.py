@@ -16,7 +16,7 @@ from pathlib import Path
 
 import httpx
 
-from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH
+from music_search.data.datasets import DEFAULT_CURATED_TRACKS_PATH
 from music_search.lyrics.cache import LyricsCache
 from music_search.lyrics.normalize import normalize_artist, normalize_title
 from music_search.lyrics.pipeline import PipelineConfig, run_pipeline

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from music_search import preprocessing
+from music_search.core import preprocessing
 
 
 def test_normalize_lowercase_e_acentos() -> None:

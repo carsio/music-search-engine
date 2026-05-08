@@ -34,7 +34,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from music_search.datasets import SpotifyTracksLoader
+from music_search.data.datasets import SpotifyTracksLoader
 from music_search.vector.config import (
     COLLECTION_NAME,
     VECTOR_DATA_DIR,

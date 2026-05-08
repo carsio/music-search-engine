@@ -18,15 +18,15 @@ from typing import Any, Literal
 
 import duckdb
 
-from music_search.albums import (
+from music_search.core.indexer import IndexBuilder, InvertedIndex
+from music_search.core.ranking import BM25, TFIDF, TfScheme
+from music_search.data.albums import (
     AlbumDocument,
     build_album_search_records,
     load_album_catalog_from_tracks,
 )
-from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH, DEFAULT_FINAL_DATASET_DIR
-from music_search.indexer import IndexBuilder, InvertedIndex
-from music_search.ranking import BM25, TFIDF, TfScheme
-from music_search.search_tuning import (
+from music_search.data.datasets import DEFAULT_CURATED_TRACKS_PATH, DEFAULT_FINAL_DATASET_DIR
+from music_search.motors.tuning import (
     SearchProfile,
     entity_weights_for_profile,
     track_weights_for_profile,

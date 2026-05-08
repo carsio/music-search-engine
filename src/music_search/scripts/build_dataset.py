@@ -1,14 +1,18 @@
-"""Build do dataset final commitavel. Orquestra:
+"""Build do dataset final commitavel.
 
-1. (opcional) `scripts/build_curated_corpus.py` -> `data/derived/final/br_curated_lyrics.parquet`
-2. `scripts/export_entities.py` -> `data/derived/final/br_{artist,album,genre,composer}s.parquet`
-3. Manifest com versao, contagens, hashes em `data/derived/final/br_dataset_manifest.json`
+Orquestra (todos relativos a ``data/derived/final/``):
+
+1. (opcional) ``music_search.scripts.build_curated_corpus`` ->
+   ``br_curated_lyrics.parquet``
+2. ``music_search.scripts.export_entities`` ->
+   ``br_{artist,album,genre,composer}s.parquet``
+3. Manifest com versao, contagens e hashes em ``br_dataset_manifest.json``.
 
 Uso tipico (enquanto o download de letras ainda corre):
-    uv run python scripts/build_dataset.py --skip-lyrics
+    uv run python -m music_search.scripts.build_dataset --skip-lyrics
 
 Quando as letras terminarem:
-    uv run python scripts/build_dataset.py
+    uv run python -m music_search.scripts.build_dataset
 """
 
 from __future__ import annotations
@@ -17,20 +21,16 @@ import argparse
 import hashlib
 import json
 import subprocess
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from music_search.datasets import (
+from music_search.data.datasets import (
     DEFAULT_CURATED_CORPUS_PATH,
     DEFAULT_CURATED_TRACKS_PATH,
     DEFAULT_FINAL_DATASET_DIR,
     BrazilianLyricsLoader,
 )
-
-# scripts/ nao e um pacote Python: importa via path-hack para reusar export_kind.
-sys.path.insert(0, str(Path(__file__).parent))
-from export_entities import KINDS, export_kind  # type: ignore[import-not-found]
+from music_search.scripts.export_entities import KINDS, export_kind
 
 DATASET_VERSION = "0.3.0"
 OUTPUT_DIR = DEFAULT_FINAL_DATASET_DIR
@@ -55,9 +55,11 @@ def _file_info(path: Path) -> dict | None:
 
 
 def _run_lyrics_corpus() -> None:
-    print(">>> build_curated_corpus.py")
+    import sys
+
+    print(">>> music_search.scripts.build_curated_corpus")
     res = subprocess.run(
-        [sys.executable, "scripts/build_curated_corpus.py"],
+        [sys.executable, "-m", "music_search.scripts.build_curated_corpus"],
         check=False,
     )
     if res.returncode != 0:

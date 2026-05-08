@@ -21,7 +21,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from music_search.preprocessing import preprocess
+from music_search.core.preprocessing import preprocess
 
 Tokenizer = Callable[[str], list[str]]
 

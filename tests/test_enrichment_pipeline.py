@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from pathlib import Path
 
 import duckdb
@@ -15,10 +14,6 @@ from music_search.enrichment.pipeline import (
     make_key,
     run_enrichment,
 )
-
-SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
 
 
 def test_run_enrichment_materializes_artist_payload_without_llm(tmp_path: Path) -> None:
@@ -80,7 +75,7 @@ def test_run_enrichment_materializes_artist_payload_without_llm(tmp_path: Path) 
 
 
 def test_export_kind_preserves_raw_text_column(tmp_path: Path) -> None:
-    from export_entities import export_kind  # type: ignore[import-not-found]
+    from music_search.scripts.export_entities import export_kind
 
     cache_path = tmp_path / "enrichment.sqlite"
     output = tmp_path / "br_genres.parquet"

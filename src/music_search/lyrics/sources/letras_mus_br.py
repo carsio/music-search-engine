@@ -21,14 +21,14 @@ import re
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from music_search.lyrics.normalize import slugify
-from music_search.lyrics.sources.base import LyricsResult, Status
-from music_search.lyrics.throttle import (
+from music_search._async_http.throttle import (
     AsyncRateLimiter,
     CircuitBreaker,
     parse_retry_after,
 )
-from music_search.lyrics.user_agents import random_browser_headers
+from music_search._async_http.user_agents import random_browser_headers
+from music_search.lyrics.normalize import slugify
+from music_search.lyrics.sources.base import LyricsResult, Status
 
 _JSONP_WRAPPER = re.compile(r"^[A-Za-z_]+\((.*)\)\s*$", re.DOTALL)
 

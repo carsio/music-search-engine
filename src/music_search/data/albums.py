@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-import re
 from typing import TypedDict
-import unicodedata
 
 import duckdb
 
-from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH
+from music_search.data.datasets import DEFAULT_CURATED_TRACKS_PATH
 
 
 class AlbumTrackRef(TypedDict):

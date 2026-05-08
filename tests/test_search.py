@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from music_search.datasets import CuratedLyricsDocument
-from music_search.search import DEFAULT_FIELD_WEIGHTS, SparseSearchEngine
+from music_search.data.datasets import CuratedLyricsDocument
+from music_search.motors.search import DEFAULT_FIELD_WEIGHTS, SparseSearchEngine
 
 
 def _make_docs() -> list[CuratedLyricsDocument]:

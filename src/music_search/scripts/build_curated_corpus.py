@@ -1,7 +1,7 @@
 """Gera o parquet consolidado do corpus curado brasileiro com letras.
 
 Uso:
-    uv run python scripts/build_curated_corpus.py
+    uv run python -m music_search.scripts.build_curated_corpus
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from music_search.datasets import (
+from music_search.data.datasets import (
     DEFAULT_CURATED_CORPUS_PATH,
     DEFAULT_CURATED_LYRICS_PATH,
     DEFAULT_CURATED_TRACKS_PATH,
