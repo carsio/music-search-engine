@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from fastapi import HTTPException
 
 from music_search.albums import AlbumDocument
 from music_search.multi_index import EntityIndex, MultiEntityIndex
-from music_search.web.app import _album_response_from_payload, app, get_album
+from music_search.web.app import _album_response_from_payload, app, get_album, search, search_lyric
 
 
 class _TrackEngineStub:
@@ -131,3 +133,95 @@ def test_get_artist_aceita_payload_minimo_wikipedia_only() -> None:
     assert response.bio == "Cantor e compositor brasileiro."
     assert response.top_tracks == []
     assert response.source_url == "https://pt.wikipedia.org/wiki/Gilberto_Gil"
+
+
+@pytest.mark.anyio
+async def test_search_encaminha_parametros_avancados_ao_multi_index() -> None:
+    class _MultiStub:
+        def __init__(self) -> None:
+            self.kwargs = {}
+
+        def search_routed(self, *_args, **kwargs):
+            self.kwargs = kwargs
+            return {
+                "intent_used": "track",
+                "hits": [
+                    {
+                        "id": "track-1",
+                        "kind": "track",
+                        "rank": 1,
+                        "score": 1.0,
+                        "track_name": "Neblina Azul",
+                        "artist_names": "Duo Mar",
+                        "lyrics_preview": "neblina no cais",
+                    }
+                ],
+            }
+
+    app.state.multi = _MultiStub()
+    app.state.nim_client = None
+    app.state.llm_cache = None
+
+    response = await search(
+        q="neblina",
+        top=7,
+        algorithm="tfidf",
+        rerank=False,
+        profile="metadata",
+        bm25_k1=2.2,
+        bm25_b=0.4,
+        tf_scheme="raw",
+    )
+
+    assert response.algorithm == "tfidf"
+    assert response.items[0].id == "track-1"
+    assert app.state.multi.kwargs == {
+        "algorithm": "tfidf",
+        "top_k": 7,
+        "profile": "metadata",
+        "bm25_k1": 2.2,
+        "bm25_b": 0.4,
+        "tf_scheme": "raw",
+    }
+
+
+def test_search_lyric_respeita_max_snippets_e_parametros_avancados() -> None:
+    class _TrackEngineStub:
+        def __init__(self) -> None:
+            self.kwargs = {}
+
+        def search(self, *_args, **kwargs):
+            self.kwargs = kwargs
+            return [
+                SimpleNamespace(
+                    id="track-1",
+                    track_name="Neblina Azul",
+                    artist_names="Duo Mar",
+                    primary_artist_name="Duo Mar",
+                    score=1.0,
+                    lyrics="Neblina no cais\nNoite sem farol\nNeblina volta cedo\nCidade acorda lenta",
+                )
+            ]
+
+    app.state.track_engine = _TrackEngineStub()
+
+    response = search_lyric(
+        q="neblina",
+        top=5,
+        algorithm="bm25",
+        profile="lyrics",
+        bm25_k1=2.0,
+        bm25_b=0.3,
+        tf_scheme="augmented",
+        max_snippets=2,
+    )
+
+    assert len(response.matches[0].snippets) == 2
+    assert app.state.track_engine.kwargs == {
+        "algorithm": "bm25",
+        "top_k": 5,
+        "profile": "lyrics",
+        "bm25_k1": 2.0,
+        "bm25_b": 0.3,
+        "tf_scheme": "augmented",
+    }

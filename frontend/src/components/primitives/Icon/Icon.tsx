@@ -5,6 +5,7 @@ export type IconName =
   | "arrow-right"
   | "arrow-up-right"
   | "close"
+  | "settings"
   | "music"
   | "user"
   | "album"
@@ -21,6 +22,7 @@ const PATHS: Record<IconName, string> = {
   "arrow-right": "M5 12h14M13 5l7 7-7 7",
   "arrow-up-right": "M7 17 17 7M7 7h10v10",
   close: "M18 6 6 18M6 6l12 12",
+  settings: "M12 3v3M12 18v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M3 12h3M18 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
   music: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
   user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
   album: "M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-7 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z",

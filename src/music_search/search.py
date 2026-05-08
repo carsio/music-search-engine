@@ -24,7 +24,8 @@ from music_search.datasets import (
     CuratedLyricsDocument,
 )
 from music_search.indexer import IndexBuilder, InvertedIndex
-from music_search.ranking import BM25, TFIDF
+from music_search.ranking import BM25, TFIDF, TfScheme
+from music_search.search_tuning import SearchProfile, track_weights_for_profile
 
 SearchAlgorithm = Literal["bm25", "tfidf"]
 
@@ -196,6 +197,10 @@ class SparseSearchEngine:
         algorithm: SearchAlgorithm,
         top_k: int = 10,
         field_weights: Mapping[str, float] | None = None,
+        profile: SearchProfile = "balanced",
+        bm25_k1: float | None = None,
+        bm25_b: float | None = None,
+        tf_scheme: TfScheme | None = None,
     ) -> list[SearchHit]:
         if top_k <= 0:
             raise ValueError(f"top_k deve ser > 0 (recebido {top_k})")
@@ -203,10 +208,15 @@ class SparseSearchEngine:
         if not query:
             return []
 
-        weights = self._resolve_field_weights(field_weights)
+        weights = self._resolve_field_weights(field_weights, profile=profile)
         combined_scores: dict[str, float] = defaultdict(float)
         contributions_by_doc: dict[str, list[FieldContribution]] = defaultdict(list)
-        rankers = self._rankers_for(algorithm)
+        rankers = self._rankers_for(
+            algorithm,
+            bm25_k1=bm25_k1,
+            bm25_b=bm25_b,
+            tf_scheme=tf_scheme,
+        )
 
         for field, weight in weights.items():
             results = rankers[field].rank(query, top_k=self.index.num_docs)
@@ -269,6 +279,10 @@ class SparseSearchEngine:
         *,
         top_k: int = 10,
         field_weights: Mapping[str, float] | None = None,
+        profile: SearchProfile = "balanced",
+        bm25_k1: float | None = None,
+        bm25_b: float | None = None,
+        tf_scheme: TfScheme | None = None,
     ) -> dict[SearchAlgorithm, list[SearchHit]]:
         return {
             "bm25": self.search(
@@ -276,12 +290,17 @@ class SparseSearchEngine:
                 algorithm="bm25",
                 top_k=top_k,
                 field_weights=field_weights,
+                profile=profile,
+                bm25_k1=bm25_k1,
+                bm25_b=bm25_b,
             ),
             "tfidf": self.search(
                 query,
                 algorithm="tfidf",
                 top_k=top_k,
                 field_weights=field_weights,
+                profile=profile,
+                tf_scheme=tf_scheme,
             ),
         }
 
@@ -293,6 +312,8 @@ class SparseSearchEngine:
     def _resolve_field_weights(
         self,
         field_weights: Mapping[str, float] | None,
+        *,
+        profile: SearchProfile = "balanced",
     ) -> dict[str, float]:
         weights = dict(self.field_weights)
         if field_weights is not None:
@@ -301,15 +322,38 @@ class SparseSearchEngine:
                 for field, weight in field_weights.items()
                 if field in self.index.fields and weight > 0
             }
+        weights = track_weights_for_profile(weights, profile)
         if not weights:
             raise ValueError("ao menos um campo com boost positivo é necessário")
         return weights
 
-    def _rankers_for(self, algorithm: SearchAlgorithm) -> Mapping[str, BM25 | TFIDF]:
+    def _rankers_for(
+        self,
+        algorithm: SearchAlgorithm,
+        *,
+        bm25_k1: float | None = None,
+        bm25_b: float | None = None,
+        tf_scheme: TfScheme | None = None,
+    ) -> Mapping[str, BM25 | TFIDF]:
         if algorithm == "bm25":
-            return self._bm25_rankers
+            if (bm25_k1 is None or bm25_k1 == 1.5) and (bm25_b is None or bm25_b == 0.75):
+                return self._bm25_rankers
+            return {
+                field: BM25(
+                    self.index,
+                    field=field,
+                    k1=1.5 if bm25_k1 is None else bm25_k1,
+                    b=0.75 if bm25_b is None else bm25_b,
+                )
+                for field in self.index.fields
+            }
         if algorithm == "tfidf":
-            return self._tfidf_rankers
+            if tf_scheme is None or tf_scheme == "log":
+                return self._tfidf_rankers
+            return {
+                field: TFIDF(self.index, field=field, tf_scheme=tf_scheme)
+                for field in self.index.fields
+            }
         raise ValueError(f"algoritmo desconhecido: {algorithm!r}")
 
 

@@ -181,3 +181,34 @@ def test_load_or_build_entity_index_reusa_cache_persistido(tmp_path, monkeypatch
     )
 
     assert loaded.documents["artist-1"]["name"] == "Gilberto Gil"
+
+
+def test_search_entity_profile_muda_prioridade_entre_nome_e_texto() -> None:
+    genre_index = EntityIndex.build(
+        "genre",
+        [
+            {
+                "id": "genre-name",
+                "name": "Neblina",
+                "description": "",
+                "raw_text": "Paisagens costeiras.",
+                "origin": "Brasil",
+                "representative_artists": [],
+            },
+            {
+                "id": "genre-text",
+                "name": "Costa Solar",
+                "description": "",
+                "raw_text": "Neblina costeira em movimentos lentos.",
+                "origin": "Brasil",
+                "representative_artists": [],
+            },
+        ],
+    )
+    multi = MultiEntityIndex(track_engine=None, entity_indexes={"genre": genre_index})
+
+    metadata_hits = multi.search_entity("genre", "neblina", algorithm="bm25", profile="metadata")
+    lyrics_hits = multi.search_entity("genre", "neblina", algorithm="bm25", profile="lyrics")
+
+    assert metadata_hits[0].id == "genre-name"
+    assert lyrics_hits[0].id == "genre-text"

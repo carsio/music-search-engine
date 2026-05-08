@@ -1,5 +1,6 @@
 import { useSearch, useLyricSearch, useArtist, useAlbum, useSong } from "../api/hooks";
 import type { AlbumResponse, ArtistResponse, SongResponse } from "../api/types";
+import type { SearchSettings } from "./useSearchSettings";
 import { resolveIntent, type ResolvedIntent } from "../utils/intent";
 
 export interface SearchFlowResult {
@@ -16,8 +17,16 @@ export interface SearchFlowResult {
   lyric: ReturnType<typeof useLyricSearch>;
 }
 
-export function useSearchFlow(query: string): SearchFlowResult {
-  const search = useSearch(query);
+export function useSearchFlow(query: string, settings: SearchSettings): SearchFlowResult {
+  const search = useSearch(query, {
+    algorithm: settings.algorithm,
+    rerank: settings.rerank,
+    top: settings.top,
+    profile: settings.profile,
+    bm25K1: settings.bm25K1,
+    bm25B: settings.bm25B,
+    tfScheme: settings.tfScheme,
+  });
   const intent = resolveIntent(search.data);
   const topItem = search.data?.items?.[0];
   const topId = topItem?.id;
@@ -36,6 +45,13 @@ export function useSearchFlow(query: string): SearchFlowResult {
 
   const lyric = useLyricSearch(query, {
     enabled: intent === "lyric" && query.trim().length > 0,
+    algorithm: settings.algorithm,
+    top: Math.max(settings.top, settings.maxSnippets),
+    profile: settings.profile,
+    bm25K1: settings.bm25K1,
+    bm25B: settings.bm25B,
+    tfScheme: settings.tfScheme,
+    maxSnippets: settings.maxSnippets,
   });
 
   const isEnriching =

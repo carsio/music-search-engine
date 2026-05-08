@@ -58,6 +58,13 @@
   max-width: 640px;
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
 .stats {
   max-width: var(--content-max);
   margin: 0 auto;
@@ -90,4 +97,21 @@
 .sep {
   color: var(--ink-4);
   margin: 0 4px;
+}
+
+@media (max-width: 980px) {
+  .row {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .row {
+    padding: 12px 20px;
+    gap: 12px;
+  }
+
+  .logoText {
+    font-size: 18px;
+  }
 }

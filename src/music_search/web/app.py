@@ -21,11 +21,13 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from music_search.multi_index import MultiEntityIndex
+from music_search.ranking import TfScheme
 from music_search.search import SparseSearchEngine, load_or_build_default_engine
+from music_search.search_tuning import SearchProfile
 from music_search.web.schemas import (
     AlbumArtistSummary,
-    AlbumResponse,
     AlbumRef,
+    AlbumResponse,
     AlbumTrack,
     ArtistResponse,
     LyricMatch,
@@ -65,10 +67,12 @@ async def lifespan(app: FastAPI):
 
         nim_client = NimClient()
         llm_cache = LLMCache()
-        logger.info("Cliente NIM ativo (modelos: extract=%s, intent=%s, rerank=%s)",
-                    nim_client.cfg.model_extract,
-                    nim_client.cfg.model_intent,
-                    nim_client.cfg.model_rerank)
+        logger.info(
+            "Cliente NIM ativo (modelos: extract=%s, intent=%s, rerank=%s)",
+            nim_client.cfg.model_extract,
+            nim_client.cfg.model_intent,
+            nim_client.cfg.model_rerank,
+        )
     else:
         logger.info("NIM_API_KEY ausente — usando fallback heuristico para intent.")
 
@@ -226,9 +230,7 @@ def _slim_track_payload(hit: dict[str, Any], payload: dict[str, Any]) -> dict[st
 
 @app.get("/healthz")
 def healthz() -> dict[str, Any]:
-    tracks = (
-        app.state.track_engine.num_docs if hasattr(app.state, "track_engine") else 0
-    )
+    tracks = app.state.track_engine.num_docs if hasattr(app.state, "track_engine") else 0
     entities = (
         {k: v.num_docs for k, v in app.state.multi.entity_indexes.items()}
         if hasattr(app.state, "multi")
@@ -243,6 +245,10 @@ async def search(
     top: Annotated[int, Query(ge=1, le=50)] = 10,
     algorithm: Annotated[str, Query(pattern="^(bm25|tfidf)$")] = "bm25",
     rerank: bool = False,
+    profile: Annotated[SearchProfile, Query()] = "balanced",
+    bm25_k1: Annotated[float, Query(gt=0.0, le=3.0)] = 1.5,
+    bm25_b: Annotated[float, Query(ge=0.0, le=1.0)] = 0.75,
+    tf_scheme: Annotated[TfScheme, Query()] = "log",
 ) -> SearchResponse:
     started = time.time()
     intent, _used_llm = await classify_intent_with_fallback(q, app)
@@ -253,6 +259,10 @@ async def search(
         intent,
         algorithm=algorithm,  # type: ignore[arg-type]
         top_k=top,
+        profile=profile,
+        bm25_k1=bm25_k1,
+        bm25_b=bm25_b,
+        tf_scheme=tf_scheme,
     )
     intent_used = routed["intent_used"]
 
@@ -310,13 +320,26 @@ def search_lyric(
     q: Annotated[str, Query(min_length=1, max_length=200)],
     top: Annotated[int, Query(ge=1, le=50)] = 20,
     algorithm: Annotated[str, Query(pattern="^(bm25|tfidf)$")] = "bm25",
+    profile: Annotated[SearchProfile, Query()] = "balanced",
+    bm25_k1: Annotated[float, Query(gt=0.0, le=3.0)] = 1.5,
+    bm25_b: Annotated[float, Query(ge=0.0, le=1.0)] = 0.75,
+    tf_scheme: Annotated[TfScheme, Query()] = "log",
+    max_snippets: Annotated[int, Query(ge=1, le=10)] = 3,
 ) -> LyricSearchResponse:
     started = time.time()
     engine: SparseSearchEngine = app.state.track_engine
-    hits = engine.search(q, algorithm=algorithm, top_k=top)  # type: ignore[arg-type]
+    hits = engine.search(
+        q,
+        algorithm=algorithm,  # type: ignore[arg-type]
+        top_k=top,
+        profile=profile,
+        bm25_k1=bm25_k1,
+        bm25_b=bm25_b,
+        tf_scheme=tf_scheme,
+    )
     matches: list[LyricMatch] = []
     for hit in hits:
-        snippets = extract_snippets(hit.lyrics, q, max_snippets=3)
+        snippets = extract_snippets(hit.lyrics, q, max_snippets=max_snippets)
         matches.append(
             LyricMatch(
                 song_id=hit.id,
@@ -349,8 +372,7 @@ def get_artist(artist_id: str) -> ArtistResponse:
             try:
                 hits = track_engine.search(name, algorithm="bm25", top_k=5)
                 top_tracks = [
-                    TrackRef(title=h.track_name, album=h.album_name or None)
-                    for h in hits
+                    TrackRef(title=h.track_name, album=h.album_name or None) for h in hits
                 ]
             except Exception as exc:
                 logger.warning("top_tracks fail for %s: %s", name, exc)
@@ -369,9 +391,7 @@ def get_artist(artist_id: str) -> ArtistResponse:
             tagline=None,
             bio=None,
             genres=[],
-            top_tracks=[
-                TrackRef(title=h.track_name, album=h.album_name or None) for h in hits
-            ],
+            top_tracks=[TrackRef(title=h.track_name, album=h.album_name or None) for h in hits],
         )
 
     return ArtistResponse(
@@ -427,9 +447,7 @@ def get_song(song_id: str) -> SongResponse:
 def _album_response_from_payload(payload: dict[str, Any]) -> AlbumResponse:
     artist_summary = payload.get("artist_summary") or {}
     tracks = [
-        AlbumTrack(**track)
-        for track in (payload.get("tracks") or [])
-        if isinstance(track, dict)
+        AlbumTrack(**track) for track in (payload.get("tracks") or []) if isinstance(track, dict)
     ]
     top_tracks = [
         TrackRef(

@@ -11,6 +11,13 @@
     var(--bg);
 }
 
+.topActions {
+  display: flex;
+  justify-content: flex-end;
+  width: min(calc(100% - 48px), var(--content-max));
+  margin: 0 auto;
+}
+
 .heroBlock {
   flex: 1;
   display: flex;
@@ -29,6 +36,10 @@
     min-height: auto;
     gap: var(--space-5);
     padding: var(--space-5) 0 var(--space-6);
+  }
+
+  .topActions {
+    width: calc(100% - 40px);
   }
 
   .heroBlock {

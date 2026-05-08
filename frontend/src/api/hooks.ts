@@ -9,6 +9,7 @@ import type {
   SearchResponse,
   SongResponse,
 } from "./types";
+import type { SearchProfile, SearchTfScheme } from "../hooks/useSearchSettings";
 
 type Opts<T> = Pick<UseQueryOptions<T>, "enabled" | "staleTime">;
 
@@ -16,18 +17,41 @@ interface SearchOpts extends Opts<SearchResponse> {
   algorithm?: SearchAlgorithm;
   rerank?: boolean;
   top?: number;
+  profile?: SearchProfile;
+  bm25K1?: number;
+  bm25B?: number;
+  tfScheme?: SearchTfScheme;
 }
 
 export function useSearch(query: string, opts: SearchOpts = {}) {
-  const { algorithm = "bm25", rerank = false, top = 10, enabled, staleTime = 60_000 } = opts;
+  const {
+    algorithm = "bm25",
+    rerank = false,
+    top = 10,
+    profile = "balanced",
+    bm25K1 = 1.5,
+    bm25B = 0.75,
+    tfScheme = "log",
+    enabled,
+    staleTime = 60_000,
+  } = opts;
   return useQuery({
     enabled: (enabled ?? true) && query.trim().length > 0,
     staleTime,
     placeholderData: (prev) => prev,
-    queryKey: ["search", query, algorithm, rerank, top],
+    queryKey: ["search", query, algorithm, rerank, top, profile, bm25K1, bm25B, tfScheme],
     queryFn: async () => {
       const { data } = await api.get<SearchResponse>("/search", {
-        params: { q: query, top, algorithm, rerank },
+        params: {
+          q: query,
+          top,
+          algorithm,
+          rerank,
+          profile,
+          bm25_k1: bm25K1,
+          bm25_b: bm25B,
+          tf_scheme: tfScheme,
+        },
       });
       return data;
     },
@@ -37,18 +61,52 @@ export function useSearch(query: string, opts: SearchOpts = {}) {
 interface LyricOpts extends Opts<LyricSearchResponse> {
   algorithm?: SearchAlgorithm;
   top?: number;
+  profile?: SearchProfile;
+  bm25K1?: number;
+  bm25B?: number;
+  tfScheme?: SearchTfScheme;
+  maxSnippets?: number;
 }
 
 export function useLyricSearch(query: string, opts: LyricOpts = {}) {
-  const { algorithm = "bm25", top = 20, enabled, staleTime = 60_000 } = opts;
+  const {
+    algorithm = "bm25",
+    top = 20,
+    profile = "balanced",
+    bm25K1 = 1.5,
+    bm25B = 0.75,
+    tfScheme = "log",
+    maxSnippets = 3,
+    enabled,
+    staleTime = 60_000,
+  } = opts;
   return useQuery({
     enabled: (enabled ?? true) && query.trim().length > 0,
     staleTime,
     placeholderData: (prev) => prev,
-    queryKey: ["lyric", query, algorithm, top],
+    queryKey: [
+      "lyric",
+      query,
+      algorithm,
+      top,
+      profile,
+      bm25K1,
+      bm25B,
+      tfScheme,
+      maxSnippets,
+    ],
     queryFn: async () => {
       const { data } = await api.get<LyricSearchResponse>("/search/lyric", {
-        params: { q: query, top, algorithm },
+        params: {
+          q: query,
+          top,
+          algorithm,
+          profile,
+          bm25_k1: bm25K1,
+          bm25_b: bm25B,
+          tf_scheme: tfScheme,
+          max_snippets: maxSnippets,
+        },
       });
       return data;
     },

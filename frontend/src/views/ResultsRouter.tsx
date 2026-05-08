@@ -8,14 +8,16 @@ import { NoResultsView } from "./NoResultsView";
 import { Loading } from "../components/states/Loading";
 import { ErrorState } from "../components/states/ErrorState";
 import { ResultsLayout } from "../components/layout/ResultsLayout";
+import type { SearchSettings } from "../hooks/useSearchSettings";
 
 interface ResultsRouterProps {
   query: string;
   onSubmit: (q: string) => void;
+  settings: SearchSettings;
 }
 
-export function ResultsRouter({ query, onSubmit }: ResultsRouterProps) {
-  const flow = useSearchFlow(query);
+export function ResultsRouter({ query, onSubmit, settings }: ResultsRouterProps) {
+  const flow = useSearchFlow(query, settings);
 
   if (flow.search.isLoading && !flow.search.data) {
     return (

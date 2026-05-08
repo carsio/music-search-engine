@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { SearchBox } from "../SearchBox";
 import styles from "./SearchHeader.module.css";
 
@@ -7,9 +7,10 @@ interface SearchHeaderProps {
   onSubmit: (q: string) => void;
   onLogoClick: () => void;
   stats?: { label: string; value: string }[];
+  actions?: ReactNode;
 }
 
-export function SearchHeader({ query, onSubmit, onLogoClick, stats }: SearchHeaderProps) {
+export function SearchHeader({ query, onSubmit, onLogoClick, stats, actions }: SearchHeaderProps) {
   const [draft, setDraft] = useState(query);
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export function SearchHeader({ query, onSubmit, onLogoClick, stats }: SearchHead
             variant="header"
           />
         </div>
+        {actions ? <div className={styles.actions}>{actions}</div> : null}
       </div>
       {stats && stats.length > 0 ? (
         <div className={styles.stats}>

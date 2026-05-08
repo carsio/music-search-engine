@@ -25,7 +25,12 @@ from music_search.albums import (
 )
 from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH, DEFAULT_FINAL_DATASET_DIR
 from music_search.indexer import IndexBuilder, InvertedIndex
-from music_search.ranking import BM25, TFIDF
+from music_search.ranking import BM25, TFIDF, TfScheme
+from music_search.search_tuning import (
+    SearchProfile,
+    entity_weights_for_profile,
+    track_weights_for_profile,
+)
 
 EntityKind = Literal["track", "artist", "album", "genre", "composer"]
 NonTrackEntity = Literal["artist", "album", "genre", "composer"]
@@ -159,19 +164,26 @@ class EntityIndex:
         *,
         algorithm: SearchAlgorithm = "bm25",
         top_k: int = 10,
+        field_weights: Mapping[str, float] | None = None,
+        profile: SearchProfile = "balanced",
+        bm25_k1: float | None = None,
+        bm25_b: float | None = None,
+        tf_scheme: TfScheme | None = None,
     ) -> list[EntityHit]:
         if top_k <= 0:
             raise ValueError("top_k deve ser > 0")
         query = query.strip()
         if not query or self.num_docs == 0:
             return []
-        rankers = (
-            {f: BM25(self.index, field=f) for f in self.index.fields}
-            if algorithm == "bm25"
-            else {f: TFIDF(self.index, field=f) for f in self.index.fields}
+        rankers = self._rankers_for(
+            algorithm,
+            bm25_k1=bm25_k1,
+            bm25_b=bm25_b,
+            tf_scheme=tf_scheme,
         )
+        weights = self._resolve_field_weights(field_weights, profile=profile)
         combined: dict[str, float] = defaultdict(float)
-        for f, weight in self.field_weights.items():
+        for f, weight in weights.items():
             if f not in rankers or weight <= 0:
                 continue
             results = rankers[f].rank(query, top_k=self.num_docs)
@@ -192,6 +204,49 @@ class EntityIndex:
             )
             for i, (doc_id, score) in enumerate(ranked)
         ]
+
+    def _resolve_field_weights(
+        self,
+        field_weights: Mapping[str, float] | None,
+        *,
+        profile: SearchProfile = "balanced",
+    ) -> dict[str, float]:
+        weights = dict(self.field_weights)
+        if field_weights is not None:
+            weights = {
+                field: float(weight)
+                for field, weight in field_weights.items()
+                if field in self.index.fields and weight > 0
+            }
+        weights = entity_weights_for_profile(self.kind, weights, profile)
+        if not weights:
+            raise ValueError("ao menos um campo com boost positivo é necessário")
+        return weights
+
+    def _rankers_for(
+        self,
+        algorithm: SearchAlgorithm,
+        *,
+        bm25_k1: float | None = None,
+        bm25_b: float | None = None,
+        tf_scheme: TfScheme | None = None,
+    ) -> dict[str, BM25 | TFIDF]:
+        if algorithm == "bm25":
+            return {
+                f: BM25(
+                    self.index,
+                    field=f,
+                    k1=1.5 if bm25_k1 is None else bm25_k1,
+                    b=0.75 if bm25_b is None else bm25_b,
+                )
+                for f in self.index.fields
+            }
+        if algorithm == "tfidf":
+            return {
+                f: TFIDF(self.index, field=f, tf_scheme="log" if tf_scheme is None else tf_scheme)
+                for f in self.index.fields
+            }
+        raise ValueError(f"algoritmo desconhecido: {algorithm!r}")
 
 
 def load_records_from_parquet(path: Path) -> list[dict[str, Any]]:
@@ -215,7 +270,14 @@ def _can_reuse_index(*, index_path: Path, source_path: Path) -> bool:
 def _load_persisted_entity_index(path: Path) -> EntityIndex | None:
     try:
         return EntityIndex.load(path)
-    except (AttributeError, EOFError, ModuleNotFoundError, OSError, TypeError, pickle.UnpicklingError):
+    except (
+        AttributeError,
+        EOFError,
+        ModuleNotFoundError,
+        OSError,
+        TypeError,
+        pickle.UnpicklingError,
+    ):
         return None
 
 
@@ -305,11 +367,23 @@ class MultiEntityIndex:
         *,
         algorithm: SearchAlgorithm = "bm25",
         top_k: int = 10,
+        profile: SearchProfile = "balanced",
+        bm25_k1: float | None = None,
+        bm25_b: float | None = None,
+        tf_scheme: TfScheme | None = None,
     ) -> list[EntityHit]:
         idx = self.entity_indexes.get(kind)
         if idx is None:
             return []
-        return idx.search(query, algorithm=algorithm, top_k=top_k)
+        return idx.search(
+            query,
+            algorithm=algorithm,
+            top_k=top_k,
+            profile=profile,
+            bm25_k1=bm25_k1,
+            bm25_b=bm25_b,
+            tf_scheme=tf_scheme,
+        )
 
     def search_routed(
         self,
@@ -318,6 +392,10 @@ class MultiEntityIndex:
         *,
         algorithm: SearchAlgorithm = "bm25",
         top_k: int = 10,
+        profile: SearchProfile = "balanced",
+        bm25_k1: float | None = None,
+        bm25_b: float | None = None,
+        tf_scheme: TfScheme | None = None,
     ) -> dict[str, Any]:
         """Seleciona o tipo vencedor comparando candidatos disponiveis."""
         normalized = intent.lower().strip()
@@ -325,12 +403,21 @@ class MultiEntityIndex:
 
         track_algorithm: SearchAlgorithm = algorithm if algorithm in ("bm25", "tfidf") else "bm25"
         if self.track_engine is not None:
-            track_hits = self.track_engine.search(query, algorithm=track_algorithm, top_k=top_k)
+            track_weights = track_weights_for_profile(self.track_engine.field_weights, profile)
+            track_hits = self.track_engine.search(
+                query,
+                algorithm=track_algorithm,
+                top_k=top_k,
+                profile=profile,
+                bm25_k1=bm25_k1,
+                bm25_b=bm25_b,
+                tf_scheme=tf_scheme,
+            )
             if track_hits:
                 candidates.append(
                     (
                         "track",
-                        self._normalized_track_score(track_hits[0])
+                        self._normalized_track_score(track_hits[0], track_weights)
                         + self._intent_bonus(normalized, "track"),
                         track_hits[0].score,
                         track_hits,
@@ -341,13 +428,22 @@ class MultiEntityIndex:
             idx = self.entity_indexes.get(entity)  # type: ignore[arg-type]
             if idx is None:
                 continue
-            entity_hits = idx.search(query, algorithm=algorithm, top_k=top_k)
+            entity_weights = idx._resolve_field_weights(None, profile=profile)
+            entity_hits = idx.search(
+                query,
+                algorithm=algorithm,
+                top_k=top_k,
+                profile=profile,
+                bm25_k1=bm25_k1,
+                bm25_b=bm25_b,
+                tf_scheme=tf_scheme,
+            )
             if not entity_hits:
                 continue
             candidates.append(
                 (
                     entity,
-                    self._normalized_entity_score(idx, entity_hits[0])
+                    self._normalized_entity_score(entity_hits[0], entity_weights)
                     + self._intent_bonus(normalized, entity),
                     entity_hits[0].score,
                     entity_hits,
@@ -371,14 +467,20 @@ class MultiEntityIndex:
             "hits": [h.to_dict() for h in hits],
         }
 
-    def _normalized_track_score(self, hit: Any) -> float:
-        if self.track_engine is None:
-            return 0.0
-        total = sum(float(weight) for weight in self.track_engine.field_weights.values()) or 1.0
+    def _normalized_track_score(
+        self,
+        hit: Any,
+        weights: Mapping[str, float],
+    ) -> float:
+        total = sum(float(weight) for weight in weights.values()) or 1.0
         return float(hit.score) / total
 
-    def _normalized_entity_score(self, idx: EntityIndex, hit: EntityHit) -> float:
-        total = sum(float(weight) for weight in idx.field_weights.values()) or 1.0
+    def _normalized_entity_score(
+        self,
+        hit: EntityHit,
+        weights: Mapping[str, float],
+    ) -> float:
+        total = sum(float(weight) for weight in weights.values()) or 1.0
         return float(hit.score) / total
 
     @staticmethod

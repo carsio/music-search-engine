@@ -93,3 +93,50 @@ def test_sparse_search_both_retorna_bm25_e_tfidf() -> None:
     assert set(results) == {"bm25", "tfidf"}
     assert results["bm25"][0].id == "t2"
     assert results["tfidf"][0].id == "t2"
+
+
+def test_sparse_search_profile_muda_o_campo_priorizado() -> None:
+    engine = SparseSearchEngine.build(
+        [
+            CuratedLyricsDocument(
+                id="meta-first",
+                track_name="Neblina Azul",
+                primary_artist_name="Duo Mar",
+                artist_names="Duo Mar",
+                artist_genres="mpb",
+                macro_genre="mpb",
+                album_name="Bruma",
+                release_date="2024-01-01",
+                release_year=2024,
+                track_popularity=70,
+                duration_ms=180000,
+                explicit=False,
+                lyrics_source="fixture",
+                lyrics_source_url="",
+                lyrics="sol e cais ao amanhecer",
+            ),
+            CuratedLyricsDocument(
+                id="lyrics-first",
+                track_name="Horizonte",
+                primary_artist_name="Duo Mar",
+                artist_names="Duo Mar",
+                artist_genres="mpb",
+                macro_genre="mpb",
+                album_name="Bruma",
+                release_date="2024-01-01",
+                release_year=2024,
+                track_popularity=70,
+                duration_ms=180000,
+                explicit=False,
+                lyrics_source="fixture",
+                lyrics_source_url="",
+                lyrics="neblina sobe no cais quando a cidade acorda",
+            ),
+        ]
+    )
+
+    metadata_hits = engine.search("neblina", algorithm="bm25", top_k=2, profile="metadata")
+    lyrics_hits = engine.search("neblina", algorithm="bm25", top_k=2, profile="lyrics")
+
+    assert metadata_hits[0].id == "meta-first"
+    assert lyrics_hits[0].id == "lyrics-first"
