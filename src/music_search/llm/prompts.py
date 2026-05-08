@@ -5,13 +5,13 @@ Toda mudanca de template incrementa PROMPT_VERSION para invalidar respostas anti
 
 from __future__ import annotations
 
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
 
-# ---------- Extracao de entidades a partir de HTML/Wikipedia ----------
+# ---------- Extracao de entidades a partir de conteudo textual/Wikipedia ----------
 
 EXTRACT_ARTIST_SYSTEM = """Voce e um extrator de dados estruturados sobre artistas musicais
-brasileiros. Receba o HTML de uma pagina (Wikipedia ou similar) e devolva APENAS um objeto
+brasileiros. Receba conteudo textual de uma pagina (Wikipedia ou similar) e devolva APENAS um objeto
 JSON com os campos especificados, sem comentarios e sem texto extra.
 
 Schema:
@@ -42,7 +42,7 @@ Schema:
   "tracks": [{"position": number | null, "title": string, "duration": string | null}]
 }
 
-Use null para campos nao confirmados pelo HTML.
+Use null para campos nao confirmados pelo conteudo.
 """
 
 EXTRACT_GENRE_SYSTEM = """Extraia dados estruturados de um genero musical (pode ser pagina geral
@@ -74,12 +74,12 @@ Schema:
 """
 
 
-def extract_user_prompt(html: str, *, source_url: str | None = None) -> str:
-    """Compoe a parte user com o HTML truncado (LLM tem janela limitada)."""
-    truncated = html[:30000]  # ~30 KB cobre Wikipedia normal
-    suffix = "" if len(html) <= 30000 else "\n[...truncado...]"
+def extract_user_prompt(source_text: str, *, source_url: str | None = None) -> str:
+    """Compoe a parte user com o conteudo truncado (LLM tem janela limitada)."""
+    truncated = source_text[:35000]
+    suffix = "" if len(source_text) <= 35000 else "\n[...truncado...]"
     src = f"\n\nFonte: {source_url}" if source_url else ""
-    return f"HTML:\n{truncated}{suffix}{src}"
+    return f"Conteudo da fonte:\n{truncated}{suffix}{src}"
 
 
 # ---------- Classificacao de intent da query ----------

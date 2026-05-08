@@ -45,7 +45,7 @@ O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, 
 │         ↓                                                       │
 │  data/derived/final/br_curated_lyrics.parquet ← CORPUS PRINCIPAL│
 │                                                                 │
-│  enrichment/ (Wikipedia PT → LLM extrai JSON estruturado)       │
+│  enrichment/ (Wikipedia PT text/API → LLM extrai JSON estruturado)│
 │         ↓                                                       │
 │  scripts/export_entities.py                                     │
 │         ↓                                                       │
@@ -81,6 +81,8 @@ Use `.env.example` como template local. O projeto lê variáveis do ambiente; se
 ```powershell
 $env:NIM_API_KEY="sua-chave"
 $env:NIM_BASE_URL="https://seu-endpoint-openai-compativel/v1"
+$env:NIM_RATE="1.0"          # reduza para 0.5 se receber muitos 429
+$env:NIM_MAX_RETRIES="4"     # retries automaticos no cliente NIM
 ```
 
 ## Modos de uso
@@ -203,8 +205,8 @@ A LLM entra somente para estruturar texto não estruturado. O fluxo é:
 ```text
 br_curated_tracks.parquet
   → seeds de artistas/álbuns/gêneros/compositores
-  → WikipediaPTSource baixa HTML
-  → llm.tasks.extract_*_json transforma HTML em JSON
+  → WikipediaPTSource baixa texto (Wikipedia-API; fallback HTML)
+  → llm.tasks.extract_*_json transforma conteudo em JSON
   → data/derived/enrichment_cache.sqlite
   → scripts/export_entities.py
   → br_artists.parquet / br_albums.parquet / br_genres.parquet / br_composers.parquet
@@ -213,7 +215,7 @@ br_curated_tracks.parquet
 Use LLM para biografia, origem, descrição, obras e relações entre entidades. Não use LLM para campos que já vêm estruturados do Spotify, como popularidade, followers, audio features, datas, label, mercados e capas.
 
 ```bash
-# Buscar HTML da Wikipedia + extrair JSON via LLM (1 entidade por vez)
+# Buscar conteudo da Wikipedia + extrair JSON via LLM (1 entidade por vez)
 uv run python -m music_search.enrichment artists --limit 500 --concurrency 4
 uv run python -m music_search.enrichment albums  --limit 500 --concurrency 4
 uv run python -m music_search.enrichment genres --concurrency 4
@@ -224,7 +226,14 @@ uv run python scripts/export_entities.py
 
 # Manifest final, sem reprocessar letras
 uv run python scripts/build_dataset.py --skip-lyrics
+
+# UI Tk para rodar o mesmo fluxo em batches manuais
+uv run python -m music_search.enrichment.ui_tk
 ```
+
+A UI exibe andamento por etapa (enrichment/export/build), cache com faltantes/erros, logs em
+tempo real (com painel maior) e
+painel de artefatos gerados (`br_*.parquet` e `br_dataset_manifest.json`).
 
 ### Spotify raw (apenas se for re-curar)
 
@@ -248,7 +257,7 @@ src/music_search/
 │
 ├── vector/             # Busca densa (embeddings + Milvus)
 ├── lyrics/             # Pipeline de extração de letras
-├── enrichment/         # Wikipedia → LLM → entidades estruturadas
+├── enrichment/         # Wikipedia text/API → LLM → entidades estruturadas
 ├── llm/                # Cliente NIM (intent / rerank / extract JSON)
 ├── _async_http/        # http async reusável (cache + throttle + circuit breaker)
 └── web/

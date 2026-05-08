@@ -15,7 +15,7 @@ WEB_PORT ?= 8000
 .PHONY: help setup setup-vector setup-lyrics setup-all nltk download download-truncated \
 	download-full corpus index search ui web lint format format-check typecheck test \
 	check vector-index vector-search vector-ui lyrics-probe lyrics-fetch lyrics-stats \
-	lyrics-export lyrics-ui
+	lyrics-export lyrics-ui enrichment-ui
 
 help: ## List available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "\nTargets disponiveis:\n\n"} /^[a-zA-Z0-9_.-]+:.*##/ { printf "  %-18s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -98,3 +98,6 @@ lyrics-export: ## Export cached lyrics hits to parquet
 
 lyrics-ui: ## Open the lyrics Tkinter UI
 	uv run --extra lyrics python -m music_search.lyrics.ui_tk
+
+enrichment-ui: ## Open the enrichment Tkinter UI
+	uv run python -m music_search.enrichment.ui_tk

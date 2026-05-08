@@ -1,0 +1,1 @@
+export { LyricsBlock } from "./LyricsBlock";

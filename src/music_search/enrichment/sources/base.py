@@ -22,9 +22,9 @@ class EnrichmentItem(dict):
 
 @runtime_checkable
 class EnrichmentSource(Protocol):
-    """Fonte que retorna HTML cru para uma entidade.
+    """Fonte que retorna conteudo cru para uma entidade.
 
-    O HTML e depois passado para a LLM para extracao estruturada.
+    O conteudo (texto/HTML) e depois passado para a LLM para extracao estruturada.
     """
 
     name: str

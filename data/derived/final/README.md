@@ -78,7 +78,13 @@ uv run python -m music_search.enrichment genres --concurrency 4
 uv run python -m music_search.enrichment composers --limit 500 --concurrency 4
 uv run python scripts/export_entities.py
 uv run python scripts/build_dataset.py --skip-lyrics
+
+# UI Tk para rodar esse fluxo manualmente
+uv run python -m music_search.enrichment.ui_tk
 ```
+
+A interface mostra o progresso por etapa, logs e os artefatos finais gerados
+(parquets de entidades + manifesto), para acompanhar o pipeline completo.
 
 A LLM entra apenas para transformar HTML/texto da Wikipedia em JSON estruturado.
 Campos ja estruturados no Spotify, como popularidade, seguidores, imagens, datas,

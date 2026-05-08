@@ -1,0 +1,79 @@
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-2) 0,
+    var(--line-3) 40%,
+    var(--bg-2) 80%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: var(--radius-md);
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--bg);
+}
+
+.skeletonBlock {
+  height: 200px;
+}
+
+.skeletonText {
+  height: 14px;
+  width: 100%;
+}
+
+.skeletonTextShort {
+  height: 14px;
+  width: 60%;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.skeletonRow {
+  height: 80px;
+}
+
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 80px 24px;
+  align-items: center;
+}
+
+.skeletonHero {
+  height: 160px;
+  width: 100%;
+  max-width: 520px;
+}

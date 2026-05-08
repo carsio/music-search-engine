@@ -1,0 +1,136 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.hero {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: 36px 32px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--accent) 35%, var(--bg)),
+    color-mix(in oklab, var(--accent) 12%, var(--bg))
+  );
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 64px;
+  line-height: 1;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+  color: #000;
+}
+
+.desc {
+  margin: 0 0 18px;
+  font-size: 15px;
+  color: rgba(0, 0, 0, 0.78);
+  max-width: 60ch;
+  line-height: 1.55;
+}
+
+.descMissing {
+  margin: 0 0 18px;
+  font-size: 13px;
+  color: var(--ink-4);
+  font-style: italic;
+}
+
+.stats {
+  display: flex;
+  gap: 22px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+}
+
+.stats strong {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 400;
+  display: block;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.stats span {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg);
+  text-align: left;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  padding: 0;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.cardCover {
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--bg-2), var(--accent));
+}
+
+.cardInfo {
+  padding: 12px 14px;
+}
+
+.cardName {
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.cardMeta {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.empty {
+  padding: 32px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-3);
+  background: var(--bg-2);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--line-2);
+}

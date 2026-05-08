@@ -7,6 +7,7 @@ Uso:
 A API e OpenAI-compativel (`POST /v1/chat/completions`). Configure via env:
 - NIM_BASE_URL
 - NIM_API_KEY
+- NIM_RATE / NIM_MAX_RETRIES
 - NIM_MODEL_EXTRACT  (default: nim-coder)
 - NIM_MODEL_INTENT   (default: nim-gemma-4-31b-it)
 - NIM_MODEL_RERANK   (default: nim-qwen3-next-80b)

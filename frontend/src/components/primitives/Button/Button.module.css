@@ -1,0 +1,82 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-pill);
+  font-family: var(--sans);
+  font-weight: 600;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast),
+    background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.label {
+  display: inline-block;
+}
+
+.sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.md {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.lg {
+  height: 50px;
+  padding: 0 24px;
+  font-size: 15px;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 2px solid var(--ink);
+}
+
+.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-sm);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.ghost:hover {
+  background: var(--bg-2);
+}
+
+.outline {
+  background: var(--bg);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+}
+
+.outline:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-sm);
+}
+
+.cta {
+  background: var(--accent);
+  color: #000;
+  border: 2px solid var(--ink);
+  width: 100%;
+}
+
+.cta:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-sm);
+}

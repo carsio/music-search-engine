@@ -23,9 +23,9 @@ async def _run(args: argparse.Namespace) -> None:
             result = await classify_intent(args.query, client=client, cache=cache)
             print(result)
         elif args.cmd == "extract-artist":
-            html = sys.stdin.read()
+            source_text = sys.stdin.read()
             result = await extract_artist_json(
-                html, source_url=args.source_url, client=client, cache=cache
+                source_text, source_url=args.source_url, client=client, cache=cache
             )
             print(json.dumps(result, ensure_ascii=False, indent=2))
         elif args.cmd == "rerank":
@@ -49,7 +49,10 @@ def main() -> None:
     p_intent = sub.add_parser("intent", help="classifica intent de uma query")
     p_intent.add_argument("query")
 
-    p_extract = sub.add_parser("extract-artist", help="extrai JSON de artista do HTML em stdin")
+    p_extract = sub.add_parser(
+        "extract-artist",
+        help="extrai JSON de artista a partir do conteudo bruto em stdin",
+    )
     p_extract.add_argument("--source-url", default=None)
 
     p_rerank = sub.add_parser("rerank", help="reranking; candidatos em stdin como JSON")

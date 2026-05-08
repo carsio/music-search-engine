@@ -1,0 +1,1 @@
+export { HomeChips } from "./HomeChips";

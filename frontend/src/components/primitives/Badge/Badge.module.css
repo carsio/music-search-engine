@@ -1,0 +1,43 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-2);
+  background: var(--bg);
+}
+
+.neutral {
+  background: var(--bg-2);
+  border-color: var(--line-2);
+  color: var(--ink-2);
+}
+
+.artist {
+  background: var(--tone-artist);
+  border-color: var(--tone-artist-border);
+}
+
+.track {
+  background: var(--tone-track);
+  border-color: var(--tone-track-border);
+}
+
+.lyric {
+  background: var(--tone-lyric);
+  border-color: var(--tone-lyric-border);
+}
+
+.genre {
+  background: var(--tone-genre);
+  border-color: var(--tone-genre-border);
+}
+
+.album {
+  background: var(--tone-album);
+  border-color: var(--tone-album-border);
+}

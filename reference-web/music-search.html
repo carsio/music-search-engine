@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>músicabr — buscador de música brasileira</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="styles.css" />
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="panels.jsx"></script>
+<script type="text/babel" src="app-shell.jsx"></script>
+<script type="text/babel" src="results.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+const {
+  ARTISTS, SONGS, WEB_RESULTS, LYRIC_MATCHES,
+  SearchHeader, Homepage, classifyQuery,
+  ResultsArtist, ResultsSong, ResultsLyric, ResultsGenre, ResultsNoResults, ResultsAlbum,
+  TweaksPanel, TweakSection, TweakColor, TweakToggle, useTweaks,
+} = window;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#fbe14b",
+  "showScores": true
+}/*EDITMODE-END*/;
+
+// Pre-built scenarios — botões de "demo" para mostrar cada tipo de tela
+const SCENARIOS = [
+  { id: "home",    label: "Homepage",        query: "" },
+  { id: "typing",  label: "Autocomplete",    query: "calc",     openSuggestions: true },
+  { id: "artist",  label: "Artista",         query: "Calcinha Preta" },
+  { id: "song",    label: "Música + Letra",  query: "Cobertor" },
+  { id: "song2",   label: "Música 2",        query: "Pra Que Fui Me Apaixonar" },
+  { id: "lyric",   label: "Trecho de letra", query: "coração" },
+  { id: "album",   label: "Álbum",           query: "álbum Raiz" },
+  { id: "genre",   label: "Gênero",          query: "forró" },
+  { id: "noresult",label: "Sem resultados",  query: "asdfg xpto" },
+];
+
+function ScenarioBar({ current, onPick }) {
+  return (
+    <div className="scenario-bar">
+      <div className="scenario-bar-inner">
+        <span className="scenario-bar-label">DEMO</span>
+        {SCENARIOS.map(s => (
+          <button
+            key={s.id}
+            className={`scenario-chip ${current === s.id ? "scenario-chip-active" : ""}`}
+            onClick={() => onPick(s)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [query, setQuery] = useState("");
+  const [submitted, setSubmitted] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [scenario, setScenario] = useState("home");
+
+  const handleSearch = (q) => {
+    setSubmitted(q);
+    setQuery(q);
+    setFocused(false);
+    // detect scenario
+    const match = SCENARIOS.find(s => s.query.toLowerCase() === q.toLowerCase());
+    setScenario(match ? match.id : "custom");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
+  const pickScenario = (s) => {
+    setScenario(s.id);
+    setSubmitted(s.query);
+    setQuery(s.query);
+    setFocused(!!s.openSuggestions);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
+  const classification = useMemo(() => classifyQuery(submitted), [submitted]);
+
+  // RI stats — fake but plausible
+  const stats = useMemo(() => {
+    if (!submitted) return null;
+    const seed = submitted.length;
+    return {
+      total: classification.kind === "no-results" ? 0 :
+             classification.kind === "artist" ? 5 + seed :
+             classification.kind === "song" ? 24 + seed * 3 :
+             classification.kind === "lyric" ? (classification.matches?.length || 1) * 4 + 12 :
+             classification.kind === "genre" ? 247 :
+             classification.kind === "album" ? 18 :
+             42,
+      time: classification.kind === "no-results" ? 3 : Math.max(4, (seed * 1.7) % 47).toFixed(0),
+    };
+  }, [submitted, classification]);
+
+  const accent = t.accent;
+  // expose accent via CSS var
+  useEffect(() => {
+    document.documentElement.style.setProperty("--accent", accent);
+  }, [accent]);
+
+  let content;
+  if (!submitted || classification.kind === "empty") {
+    content = <Homepage onSearch={handleSearch} accent={accent} />;
+  } else if (classification.kind === "artist") {
+    content = <ResultsArtist artist={classification.artist} accent={accent} showScores={t.showScores} onSearch={handleSearch} />;
+  } else if (classification.kind === "song" || classification.kind === "song-intent") {
+    const song = classification.song || Object.values(SONGS).find(s => s.title.toLowerCase().includes((classification.target || "").toLowerCase()));
+    if (song) content = <ResultsSong song={song} query={submitted} accent={accent} showScores={t.showScores} onSearch={handleSearch} />;
+    else content = <ResultsNoResults q={submitted} accent={accent} onSearch={handleSearch} />;
+  } else if (classification.kind === "lyric") {
+    content = <ResultsLyric token={classification.token} matches={classification.matches} query={submitted} accent={accent} showScores={t.showScores} onSearch={handleSearch} />;
+  } else if (classification.kind === "genre") {
+    content = <ResultsGenre genre={classification.genre} accent={accent} showScores={t.showScores} onSearch={handleSearch} />;
+  } else if (classification.kind === "album") {
+    content = <ResultsAlbum accent={accent} onSearch={handleSearch} />;
+  } else {
+    content = <ResultsNoResults q={submitted} accent={accent} onSearch={handleSearch} />;
+  }
+
+  // expose accent to suggestions/links coloring
+  return (
+    <div style={{ "--accent": accent }}>
+      <ScenarioBar current={scenario} onPick={pickScenario} />
+      {submitted && (
+        <SearchHeader
+          query={submitted}
+          setQuery={setQuery}
+          onSubmit={handleSearch}
+          accent={accent}
+          stats={stats}
+          focused={focused}
+          setFocused={setFocused}
+        />
+      )}
+      {content}
+      <TweaksPanel>
+        <TweakSection label="Cor de destaque" />
+        <TweakColor
+          label="Accent"
+          value={accent}
+          options={["#fbe14b", "#ff6b35", "#4a90ff", "#1f8a5b", "#e0407a", "#9d4edd"]}
+          onChange={(v) => setTweak("accent", v)}
+        />
+        <TweakSection label="Métricas RI" />
+        <TweakToggle
+          label="Mostrar scores BM25 / TF-IDF"
+          value={t.showScores}
+          onChange={(v) => setTweak("showScores", v)}
+        />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+
+<style>
+.scenario-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #0a0a0a;
+  color: #f5f5f5;
+  border-bottom: 1px solid #2a2a2a;
+}
+.scenario-bar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 8px 28px;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.scenario-bar-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin-right: 8px;
+}
+.scenario-chip {
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: 100px;
+  border: 1px solid #2a2a2a;
+  color: #d0d0d0;
+  background: transparent;
+  transition: all 0.15s;
+}
+.scenario-chip:hover { border-color: #555; color: #fff; }
+.scenario-chip-active {
+  background: var(--accent, #fbe14b);
+  color: #000;
+  border-color: var(--accent, #fbe14b);
+  font-weight: 600;
+}
+.header { top: 38px !important; }
+</style>
+</body>
+</html>

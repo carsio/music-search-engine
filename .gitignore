@@ -22,7 +22,6 @@ data/derived/final/*
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 

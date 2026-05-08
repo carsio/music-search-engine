@@ -1,0 +1,54 @@
+:root {
+  --bg: oklch(0.985 0.005 85);
+  --bg-2: oklch(0.965 0.008 85);
+  --ink: #0a0a0a;
+  --ink-2: #2a2a2a;
+  --ink-3: #5e5e5e;
+  --ink-4: #9a9a9a;
+  --line: #1a1a1a;
+  --line-2: rgba(0, 0, 0, 0.12);
+  --line-3: rgba(0, 0, 0, 0.06);
+  --accent: #fbe14b;
+  --accent-ink: #0a0a0a;
+
+  --tone-artist: #ffe4ec;
+  --tone-artist-border: #f8a5be;
+  --tone-track: #dff5e5;
+  --tone-track-border: #8bd0a0;
+  --tone-lyric: #fff4cc;
+  --tone-lyric-border: #e9c44d;
+  --tone-genre: #e6e6ff;
+  --tone-genre-border: #a5a5ee;
+  --tone-album: #ffe5cc;
+  --tone-album-border: #f0b070;
+
+  --serif: "Instrument Serif", "EB Garamond", Georgia, serif;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 100px;
+
+  --shadow-card: 4px 4px 0 var(--ink);
+  --shadow-card-sm: 3px 3px 0 var(--ink);
+  --shadow-card-lg: 6px 6px 0 var(--ink);
+
+  --transition-fast: 0.15s;
+  --transition-slow: 0.25s;
+
+  --content-max: 1280px;
+  --content-narrow: 720px;
+  --sidebar-width: 380px;
+}

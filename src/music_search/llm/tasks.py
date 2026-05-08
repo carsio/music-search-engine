@@ -2,7 +2,7 @@
 
 Funcoes:
 - extract_artist_json / extract_album_json / extract_genre_json / extract_composer_json:
-  recebem HTML cru e devolvem dict com schema definido em prompts.py.
+  recebem conteudo cru (texto/HTML) e devolvem dict com schema definido em prompts.py.
 - classify_intent: recebe query string e devolve um Literal de intent.
 - rerank: recebe query + candidatos + top_k e devolve a lista reordenada.
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from music_search.llm.cache import LLMCache
 from music_search.llm.client import NimClient
@@ -84,15 +84,15 @@ async def _chat_json(
 
 async def _extract_entity(
     *,
-    html: str,
+    source_text: str,
     source_url: str | None,
     system: str,
     template_id: str,
     client: NimClient,
     cache: LLMCache | None,
 ) -> dict:
-    user = extract_user_prompt(html, source_url=source_url)
-    payload = {"v": PROMPT_VERSION, "src": source_url, "html_sha": _hash(html)}
+    user = extract_user_prompt(source_text, source_url=source_url)
+    payload = {"v": PROMPT_VERSION, "src": source_url, "content_sha": _hash(source_text)}
     return await _chat_json(
         client,
         system=system,
@@ -112,14 +112,14 @@ def _hash(text: str) -> str:
 
 
 async def extract_artist_json(
-    html: str,
+    source_text: str,
     *,
     source_url: str | None = None,
     client: NimClient,
     cache: LLMCache | None = None,
 ) -> dict:
     return await _extract_entity(
-        html=html,
+        source_text=source_text,
         source_url=source_url,
         system=EXTRACT_ARTIST_SYSTEM,
         template_id=f"extract_artist_{PROMPT_VERSION}",
@@ -129,14 +129,14 @@ async def extract_artist_json(
 
 
 async def extract_album_json(
-    html: str,
+    source_text: str,
     *,
     source_url: str | None = None,
     client: NimClient,
     cache: LLMCache | None = None,
 ) -> dict:
     return await _extract_entity(
-        html=html,
+        source_text=source_text,
         source_url=source_url,
         system=EXTRACT_ALBUM_SYSTEM,
         template_id=f"extract_album_{PROMPT_VERSION}",
@@ -146,14 +146,14 @@ async def extract_album_json(
 
 
 async def extract_genre_json(
-    html: str,
+    source_text: str,
     *,
     source_url: str | None = None,
     client: NimClient,
     cache: LLMCache | None = None,
 ) -> dict:
     return await _extract_entity(
-        html=html,
+        source_text=source_text,
         source_url=source_url,
         system=EXTRACT_GENRE_SYSTEM,
         template_id=f"extract_genre_{PROMPT_VERSION}",
@@ -163,14 +163,14 @@ async def extract_genre_json(
 
 
 async def extract_composer_json(
-    html: str,
+    source_text: str,
     *,
     source_url: str | None = None,
     client: NimClient,
     cache: LLMCache | None = None,
 ) -> dict:
     return await _extract_entity(
-        html=html,
+        source_text=source_text,
         source_url=source_url,
         system=EXTRACT_COMPOSER_SYSTEM,
         template_id=f"extract_composer_{PROMPT_VERSION}",
@@ -199,7 +199,7 @@ async def classify_intent(
         max_tokens=64,
     )
     intent = str(parsed.get("intent", "none")).lower()
-    return intent if intent in _VALID_INTENTS else "none"  # type: ignore[return-value]
+    return cast(Intent, intent if intent in _VALID_INTENTS else "none")
 
 
 # ---------- Reranking ----------

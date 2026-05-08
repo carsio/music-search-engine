@@ -85,9 +85,7 @@ class KeyValueCache:
         retry_misses: bool = False,
         retry_blocked: bool = False,
     ) -> bool:
-        row = self.conn.execute(
-            f"SELECT status FROM {self.table} WHERE key = ?", (key,)
-        ).fetchone()
+        row = self.conn.execute(f"SELECT status FROM {self.table} WHERE key = ?", (key,)).fetchone()
         if row is None:
             return False
         status = row["status"]
@@ -201,10 +199,34 @@ class KeyValueCache:
                     out["payload"] = None
             yield out
 
+    def list_by_kind(self, kind: str, limit: int = 500) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            f"""
+            SELECT key, kind, status, source, source_url, payload_json,
+                   error, attempts, fetched_at, trace
+            FROM {self.table}
+            WHERE kind = ?
+            ORDER BY fetched_at DESC, key ASC
+            LIMIT ?
+            """,
+            (kind, max(1, int(limit))),
+        ).fetchall()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            payload_json = item.get("payload_json")
+            if payload_json:
+                try:
+                    item["payload"] = json.loads(payload_json)
+                except json.JSONDecodeError:
+                    item["payload"] = None
+            else:
+                item["payload"] = None
+            out.append(item)
+        return out
+
     def total(self) -> int:
-        return self.conn.execute(
-            f"SELECT count(*) FROM {self.table}"
-        ).fetchone()[0]
+        return self.conn.execute(f"SELECT count(*) FROM {self.table}").fetchone()[0]
 
     def close(self) -> None:
         self.conn.close()
