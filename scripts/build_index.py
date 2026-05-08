@@ -1,9 +1,9 @@
-"""Constrói o índice invertido dos tracks do Spotify e persiste em disco.
+"""Constrói o índice invertido e persiste em disco.
 
 Uso:
-    uv run python scripts/build_index.py                       # todos os tracks
-    uv run python scripts/build_index.py --limit 10000         # amostra
-    uv run python scripts/build_index.py --output data/indexes/dev.pkl
+    uv run python scripts/build_index.py
+    uv run python scripts/build_index.py --dataset spotify
+    uv run python scripts/build_index.py --limit 1000
 """
 
 from __future__ import annotations
@@ -12,25 +12,46 @@ import argparse
 import time
 from pathlib import Path
 
-from music_search.datasets import DEFAULT_PARQUET_DIR, FIELDS, SpotifyTracksLoader
+from music_search.datasets import (
+    CURATED_FIELDS,
+    DEFAULT_CURATED_CORPUS_PATH,
+    DEFAULT_PARQUET_DIR,
+    FIELDS,
+    BrazilianLyricsLoader,
+    SpotifyTracksLoader,
+)
 from music_search.indexer import IndexBuilder
+from music_search.search import DEFAULT_INDEX_PATH
 
-DEFAULT_OUTPUT = Path("data/indexes/spotify.pkl")
+DEFAULT_SPOTIFY_OUTPUT = Path("data/indexes/spotify.pkl")
+DATASET_CHOICES = ("curated-br", "spotify")
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Build inverted index from Spotify parquets.")
+    p = argparse.ArgumentParser(description="Build inverted index from supported datasets.")
+    p.add_argument(
+        "--dataset",
+        choices=DATASET_CHOICES,
+        default="curated-br",
+        help="dataset a indexar (default: curated-br)",
+    )
     p.add_argument(
         "--parquet-dir",
         type=Path,
         default=DEFAULT_PARQUET_DIR,
-        help=f"diretório dos parquets (default: {DEFAULT_PARQUET_DIR})",
+        help=f"diretório dos parquets do Spotify (default: {DEFAULT_PARQUET_DIR})",
+    )
+    p.add_argument(
+        "--corpus",
+        type=Path,
+        default=DEFAULT_CURATED_CORPUS_PATH,
+        help=f"parquet consolidado do corpus curado (default: {DEFAULT_CURATED_CORPUS_PATH})",
     )
     p.add_argument(
         "--output",
         type=Path,
-        default=DEFAULT_OUTPUT,
-        help=f"arquivo de saída do índice (default: {DEFAULT_OUTPUT})",
+        default=None,
+        help="arquivo de saída do índice (default depende do dataset)",
     )
     p.add_argument(
         "--limit",
@@ -49,12 +70,23 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    loader = SpotifyTracksLoader(parquet_dir=args.parquet_dir)
-    builder = IndexBuilder(fields=FIELDS)
+    if args.dataset == "spotify":
+        loader = SpotifyTracksLoader(parquet_dir=args.parquet_dir)
+        fields = FIELDS
+        source_label = str(args.parquet_dir)
+        output = args.output or DEFAULT_SPOTIFY_OUTPUT
+    else:
+        loader = BrazilianLyricsLoader(corpus_path=args.corpus)
+        fields = CURATED_FIELDS
+        source_label = str(args.corpus)
+        output = args.output or DEFAULT_INDEX_PATH
 
-    print(f"[build_index] lendo de {args.parquet_dir}")
+    builder = IndexBuilder(fields=fields)
+
+    print(f"[build_index] dataset={args.dataset}")
+    print(f"[build_index] lendo de {source_label}")
     total = args.limit or loader.count()
-    print(f"[build_index] indexando {total} documento(s) nos campos {FIELDS}")
+    print(f"[build_index] indexando {total} documento(s) nos campos {fields}")
 
     start = time.perf_counter()
     for i, doc in enumerate(loader.iter_docs(limit=args.limit), start=1):
@@ -68,9 +100,9 @@ def main() -> None:
     index = builder.build()
     build_time = time.perf_counter() - start
 
-    print(f"[build_index] salvando em {args.output}")
-    index.save(args.output)
-    size_mb = args.output.stat().st_size / (1024 * 1024)
+    print(f"[build_index] salvando em {output}")
+    index.save(output)
+    size_mb = output.stat().st_size / (1024 * 1024)
 
     print(
         f"[build_index] pronto em {build_time:.1f}s — "

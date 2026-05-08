@@ -1,0 +1,1 @@
+export { LyricMatchCard } from "./LyricMatchCard";

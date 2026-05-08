@@ -1,0 +1,1 @@
+export { GenrePanel } from "./GenrePanel";

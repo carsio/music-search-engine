@@ -12,25 +12,31 @@ ja resolvidas — apenas avanca para as proximas pendentes.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import queue
 import subprocess
 import sys
 import threading
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox, scrolledtext, ttk
 from typing import Any
 
 import httpx
 
+from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH
 from music_search.lyrics.cache import LyricsCache
 from music_search.lyrics.cli import _build_sources
-from music_search.lyrics.normalize import normalize_artist, normalize_title
-from music_search.lyrics.pipeline import read_tracks
-from music_search.lyrics.sources.base import LyricsSource, Status
+from music_search.lyrics.pipeline import (
+    PipelineConfig,
+    _process_track,
+    read_tracks,
+)
+from music_search.lyrics.sources.base import LyricsSource
 
-DEFAULT_PARQUET = Path("data/derived/br_curated_tracks.parquet")
+DEFAULT_PARQUET = DEFAULT_CURATED_TRACKS_PATH
 DEFAULT_CACHE = Path("data/derived/lyrics_cache.sqlite")
 
 _WINDOW_TITLE = "Letras — Downloader manual"
@@ -148,7 +154,11 @@ class LyricsApp(tk.Tk):
         self._progress_label.pack(anchor="w", pady=(2, 0))
 
     def _build_table(self) -> None:
-        frame = ttk.LabelFrame(self, text="Últimas letras processadas", padding=(8, 4))
+        frame = ttk.LabelFrame(
+            self,
+            text="Últimas letras processadas (duplo-clique = log; Ctrl+C / Botão direito = copiar)",
+            padding=(8, 4),
+        )
         frame.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 8))
 
         columns = ("status", "source", "artist", "title")
@@ -168,6 +178,22 @@ class LyricsApp(tk.Tk):
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
         self._tree.bind("<Double-1>", self._show_selected_lyric)
+        # Copia da celula sob o cursor (Ctrl+C copia a selecionada; clique direito
+        # copia a celula clicada). Em macOS o usuario costuma usar Cmd em vez de Ctrl.
+        self._tree.bind("<Control-c>", self._copy_selected_row)
+        self._tree.bind("<Control-C>", self._copy_selected_row)
+        self._tree.bind("<Command-c>", self._copy_selected_row)
+        self._tree.bind("<Button-3>", self._show_row_context_menu)
+        # No macOS o "right click" costuma ser Button-2 ou Control-Click.
+        self._tree.bind("<Button-2>", self._show_row_context_menu)
+        self._tree.bind("<Control-Button-1>", self._show_row_context_menu)
+
+        self._row_menu = tk.Menu(self._tree, tearoff=0)
+        self._row_menu_target: tuple[str, str] | None = None  # (item_id, column)
+        self._row_menu.add_command(label="Copiar célula", command=self._copy_menu_cell)
+        self._row_menu.add_command(label="Copiar linha (TSV)", command=self._copy_menu_row)
+        self._row_menu.add_separator()
+        self._row_menu.add_command(label="Abrir log da busca", command=self._open_menu_lyric)
 
     def _build_log(self) -> None:
         frame = ttk.LabelFrame(self, text="Log", padding=(8, 4))
@@ -242,7 +268,10 @@ class LyricsApp(tk.Tk):
         sel = self._tree.selection()
         if not sel:
             return
-        tags = self._tree.item(sel[0], "tags")
+        self._open_lyric_window(sel[0])
+
+    def _open_lyric_window(self, item_id: str) -> None:
+        tags = self._tree.item(item_id, "tags")
         track_id = tags[0] if tags else None
         if not track_id:
             return
@@ -251,19 +280,208 @@ class LyricsApp(tk.Tk):
         cache.close()
         if not row:
             return
+
         win = tk.Toplevel(self)
         win.title(f"{row['artist']} — {row['title']}")
-        win.geometry("640x520")
-        header = (
-            f"Status: {row['status']}    Fonte: {row.get('source') or '—'}\n"
-            f"URL: {row.get('source_url') or '—'}\n"
-            f"Track ID: {row['track_id']}"
+        win.geometry("820x640")
+
+        header_text = (
+            f"Status:     {row['status']}\n"
+            f"Fonte:      {row.get('source') or '—'}\n"
+            f"URL:        {row.get('source_url') or '—'}\n"
+            f"Track ID:   {row['track_id']}\n"
+            f"Tentativas: {row.get('attempts') or '—'}\n"
+            f"Resolvido:  {self._fmt_timestamp(row.get('fetched_at'))}"
         )
-        ttk.Label(win, text=header, padding=12, justify="left").pack(anchor="w")
-        text = scrolledtext.ScrolledText(win, wrap=tk.WORD)
-        text.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 12))
-        text.insert("1.0", row.get("lyrics") or row.get("error") or "(vazio)")
-        text.configure(state="disabled")
+        ttk.Label(win, text=header_text, padding=12, justify="left", font=("Courier", 9)).pack(
+            anchor="w"
+        )
+
+        notebook = ttk.Notebook(win)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 12))
+
+        # --- Aba 1: letra / erro
+        lyrics_frame = ttk.Frame(notebook)
+        notebook.add(lyrics_frame, text="Letra")
+        lyrics_text = scrolledtext.ScrolledText(lyrics_frame, wrap=tk.WORD)
+        lyrics_text.pack(fill=tk.BOTH, expand=True)
+        lyrics_text.insert("1.0", row.get("lyrics") or row.get("error") or "(vazio)")
+        lyrics_text.configure(state="disabled")
+
+        # --- Aba 2: log da busca (trace)
+        trace_frame = ttk.Frame(notebook)
+        notebook.add(trace_frame, text="Log da busca")
+        trace_text = scrolledtext.ScrolledText(trace_frame, wrap=tk.NONE, font=("Courier", 9))
+        trace_text.pack(fill=tk.BOTH, expand=True)
+        trace_text.insert("1.0", self._format_trace(row.get("trace"), row))
+        trace_text.configure(state="disabled")
+
+        # --- Aba 3: trace cru (JSON)
+        raw_frame = ttk.Frame(notebook)
+        notebook.add(raw_frame, text="Trace JSON")
+        raw_text = scrolledtext.ScrolledText(raw_frame, wrap=tk.NONE, font=("Courier", 9))
+        raw_text.pack(fill=tk.BOTH, expand=True)
+        raw = row.get("trace") or "[]"
+        try:
+            pretty = json.dumps(json.loads(raw), indent=2, ensure_ascii=False)
+        except (TypeError, ValueError):
+            pretty = raw
+        raw_text.insert("1.0", pretty)
+        raw_text.configure(state="disabled")
+
+    @staticmethod
+    def _fmt_timestamp(ts: Any) -> str:
+        if not ts:
+            return "—"
+        try:
+            return datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M:%S")
+        except (TypeError, ValueError):
+            return "—"
+
+    @staticmethod
+    def _format_trace(trace_json: str | None, row: dict) -> str:
+        """Formata o trace JSON num bloco legivel, uma tentativa por bloco."""
+        if not trace_json:
+            return (
+                "(sem trace registrado — provavelmente faixa processada antes da migration "
+                "que adicionou a coluna `trace`. Reprocesse com Re-tentar misses/errors para "
+                "popular o log.)"
+            )
+        try:
+            trace = json.loads(trace_json)
+        except (TypeError, ValueError):
+            return f"(trace invalido)\n\n{trace_json}"
+
+        if not isinstance(trace, list) or not trace:
+            return "(trace vazio)"
+
+        lines: list[str] = []
+        lines.append(f"Total de tentativas registradas: {len(trace)}")
+        lines.append("=" * 80)
+        for i, raw_entry in enumerate(trace, 1):
+            if not isinstance(raw_entry, dict):
+                continue
+            # cast pra dict[str, Any] — JSON garantiu que e dict, e ty nao
+            # consegue inferir os tipos de valor a partir de um isinstance check.
+            entry = {str(k): v for k, v in raw_entry.items()}
+            ts = entry.get("ts")
+            ts_fmt = (
+                datetime.fromtimestamp(int(ts)).strftime("%H:%M:%S") if isinstance(ts, int) else "—"
+            )
+            status = str(entry.get("status", "?")).upper()
+            source = entry.get("source") or "(pre-fetch)"
+            elapsed = entry.get("elapsed_ms")
+            elapsed_str = f"{elapsed} ms" if isinstance(elapsed, int) else "—"
+            attempts = entry.get("attempts")
+            chars = entry.get("lyrics_chars") or 0
+
+            lines.append(
+                f"[{i:>2}] {ts_fmt}  {status:<7}  fonte={source:<14}  "
+                f"tempo={elapsed_str:<8}  attempts={attempts}"
+            )
+            lines.append(f"     query: artist={entry.get('query_artist')!r}")
+            lines.append(f"            title ={entry.get('query_title')!r}")
+            raw_title = entry.get("raw_title")
+            query_title = entry.get("query_title")
+            if raw_title and raw_title != query_title:
+                lines.append(f"     (raw_title original: {raw_title!r})")
+            source_url = entry.get("source_url")
+            if source_url:
+                lines.append(f"     url:    {source_url}")
+            err = entry.get("error")
+            if err:
+                lines.append(f"     erro:   {err}")
+            if status == "HIT":
+                lines.append(f"     letra:  {chars} chars")
+            lines.append("")
+        return "\n".join(lines)
+
+    # ----------------------------------------------------------- copy helpers
+
+    def _column_under_event(self, event: Any) -> str | None:
+        """Devolve a coluna ('#1', '#2', ...) na qual o evento ocorreu, ou None."""
+        try:
+            col = self._tree.identify_column(event.x)
+        except (AttributeError, tk.TclError):
+            return None
+        return col or None
+
+    def _row_under_event(self, event: Any) -> str | None:
+        try:
+            row = self._tree.identify_row(event.y)
+        except (AttributeError, tk.TclError):
+            return None
+        return row or None
+
+    def _cell_value(self, item_id: str, column: str | None) -> str:
+        """Devolve o valor textual de uma celula. column = '#1'..'#N' ou None
+        (entao devolve a linha inteira como TSV)."""
+        if not item_id:
+            return ""
+        values = self._tree.item(item_id, "values")
+        if not values:
+            return ""
+        if column and column.startswith("#"):
+            try:
+                idx = int(column[1:]) - 1
+            except ValueError:
+                idx = -1
+            if 0 <= idx < len(values):
+                return str(values[idx])
+        return "\t".join(str(v) for v in values)
+
+    def _copy_to_clipboard(self, text: str) -> None:
+        if not text:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(text)
+        # update() para garantir que a clipboard sobreviva apos o app fechar.
+        self.update()
+        preview = text if len(text) <= 80 else text[:77] + "…"
+        self._log_line(f"📋 Copiado: {preview}")
+
+    def _copy_selected_row(self, _event: Any = None) -> str | None:
+        sel = self._tree.selection()
+        if not sel:
+            return None
+        # Quando dispara via Ctrl+C nao temos uma celula especifica — copia a linha.
+        text = self._cell_value(sel[0], None)
+        self._copy_to_clipboard(text)
+        return "break"
+
+    def _show_row_context_menu(self, event: Any) -> None:
+        item_id = self._row_under_event(event)
+        column = self._column_under_event(event)
+        if not item_id:
+            return
+        # Foca a linha clicada para feedback visual.
+        self._tree.selection_set(item_id)
+        self._tree.focus(item_id)
+        self._row_menu_target = (item_id, column or "")
+        try:
+            self._row_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self._row_menu.grab_release()
+
+    def _copy_menu_cell(self) -> None:
+        if not self._row_menu_target:
+            return
+        item_id, column = self._row_menu_target
+        text = self._cell_value(item_id, column or None)
+        self._copy_to_clipboard(text)
+
+    def _copy_menu_row(self) -> None:
+        if not self._row_menu_target:
+            return
+        item_id, _ = self._row_menu_target
+        text = self._cell_value(item_id, None)
+        self._copy_to_clipboard(text)
+
+    def _open_menu_lyric(self) -> None:
+        if not self._row_menu_target:
+            return
+        item_id, _ = self._row_menu_target
+        self._open_lyric_window(item_id)
 
     # ----------------------------------------------------- worker / refresh
 
@@ -312,7 +530,19 @@ class LyricsApp(tk.Tk):
 
         self._event_queue.put(("progress", {"done": 0, "total": len(pending), "label": "rodando…"}))
 
-        timeout = httpx.Timeout(20.0, connect=10.0)
+        cfg = PipelineConfig(
+            parquet_path=self._parquet_path,
+            cache_path=self._cache_path,
+            concurrency=concurrency,
+            request_timeout=20.0,
+            max_retries=2,
+            retry_errors=retry_errors,
+            retry_misses=retry_misses,
+            retry_blocked=retry_blocked,
+            limit=limit,
+        )
+
+        timeout = httpx.Timeout(cfg.request_timeout, connect=10.0)
         limits = httpx.Limits(
             max_connections=concurrency * 2,
             max_keepalive_connections=concurrency,
@@ -331,81 +561,22 @@ class LyricsApp(tk.Tk):
             done_count = {"n": 0}
 
             async def _process(track: dict) -> None:
+                # Honra o stop flag antes de pegar o semaphore — evita iniciar
+                # novos requests apos o usuario clicar em Parar.
                 if self._stop_flag.is_set():
                     return
-                async with sem:
-                    if self._stop_flag.is_set():
-                        return
-                    artist = normalize_artist(track.get("primary_artist_name") or "")
-                    title = normalize_title(track.get("track_name") or "")
-                    if not artist or not title:
-                        async with cache_lock:
-                            cache.upsert(
-                                track_id=track["track_id"],
-                                isrc=track.get("isrc"),
-                                artist=artist,
-                                title=title,
-                                status=Status.MISS.value,
-                                error="empty artist or title",
-                            )
-                        self._after_track(done_count, len(pending), track, "miss", None)
-                        return
-                    final = None
-                    for source in sources:
-                        if self._stop_flag.is_set():
-                            return
-                        result = await source.fetch(artist, title)
-                        final = result
-                        if result.status == Status.HIT:
-                            async with cache_lock:
-                                cache.upsert(
-                                    track_id=track["track_id"],
-                                    isrc=track.get("isrc"),
-                                    artist=artist,
-                                    title=title,
-                                    status=Status.HIT.value,
-                                    source=result.source,
-                                    source_url=result.source_url,
-                                    lyrics=result.lyrics,
-                                )
-                            self._after_track(done_count, len(pending), track, "hit", result.source)
-                            return
-                        if result.status == Status.ERROR:
-                            # 1 retry simples
-                            await asyncio.sleep(1.0)
-                            result = await source.fetch(artist, title)
-                            final = result
-                            if result.status == Status.HIT:
-                                async with cache_lock:
-                                    cache.upsert(
-                                        track_id=track["track_id"],
-                                        isrc=track.get("isrc"),
-                                        artist=artist,
-                                        title=title,
-                                        status=Status.HIT.value,
-                                        source=result.source,
-                                        source_url=result.source_url,
-                                        lyrics=result.lyrics,
-                                    )
-                                self._after_track(
-                                    done_count, len(pending), track, "hit", result.source
-                                )
-                                return
-                    status = (final.status if final else Status.ERROR).value
-                    async with cache_lock:
-                        cache.upsert(
-                            track_id=track["track_id"],
-                            isrc=track.get("isrc"),
-                            artist=artist,
-                            title=title,
-                            status=status,
-                            source=final.source if final else None,
-                            source_url=final.source_url if final else None,
-                            error=final.error if final else "no source",
-                        )
-                    self._after_track(
-                        done_count, len(pending), track, status, final.source if final else None
-                    )
+                # Reutiliza _process_track do pipeline: ele ja faz variantes,
+                # retries com backoff e gravacao do trace estruturado no cache.
+                status = await _process_track(track, sources, cache, sem, cfg, cache_lock)
+                # Le source de volta do cache (o pipeline grava la com trace).
+                row = cache.get(track["track_id"]) or {}
+                self._after_track(
+                    done_count,
+                    len(pending),
+                    track,
+                    status,
+                    row.get("source"),
+                )
 
             tasks = [asyncio.create_task(_process(t)) for t in pending]
             await asyncio.gather(*tasks, return_exceptions=True)

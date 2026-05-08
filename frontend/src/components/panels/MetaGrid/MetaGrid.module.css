@@ -1,0 +1,25 @@
+.grid {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg-2);
+  border-radius: var(--radius-md);
+}
+
+.label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}

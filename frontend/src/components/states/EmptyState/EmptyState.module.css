@@ -1,0 +1,52 @@
+.box {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: 40px 36px;
+  background: var(--bg);
+}
+
+.iconBox {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: 36px;
+  box-shadow: var(--shadow-card);
+  background: var(--accent);
+  margin-bottom: 20px;
+}
+
+.title {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin-bottom: 10px;
+}
+
+.hint {
+  color: var(--ink-3);
+  margin: 0 0 18px;
+  font-size: 14px;
+  max-width: 60ch;
+}
+
+.subtitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

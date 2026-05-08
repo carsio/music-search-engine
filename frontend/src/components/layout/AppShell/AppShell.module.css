@@ -1,0 +1,8 @@
+.app {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.main {
+  animation: fadeIn 0.25s ease-out;
+}

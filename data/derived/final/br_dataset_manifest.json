@@ -1,0 +1,36 @@
+{
+  "version": "0.3.0",
+  "generated_at": "2026-05-08T13:00:52.378129+00:00",
+  "files": {
+    "curated_tracks": {
+      "path": "data/derived/final/br_curated_tracks.parquet",
+      "bytes": 15950950,
+      "sha1": "00d30b0f1aeb79b83f1c3011add53134f44119e2"
+    },
+    "curated_lyrics": {
+      "path": "data/derived/final/br_curated_lyrics.parquet",
+      "bytes": 17482111,
+      "sha1": "88e1cf94f0c528d92ab3428494580be3e909a32e"
+    },
+    "artists": {
+      "path": "data/derived/final/br_artists.parquet",
+      "bytes": 28461069,
+      "sha1": "814c808cf86c436e77132a9bbcba9aaa75c71a77"
+    },
+    "albums": null,
+    "genres": {
+      "path": "data/derived/final/br_genres.parquet",
+      "bytes": 141452,
+      "sha1": "c1b0cd85374631c025ade6a23064efa1ab53d52c"
+    },
+    "composers": null
+  },
+  "counts": {
+    "curated_tracks": 50000,
+    "curated_lyrics": 36017,
+    "artists": 7255,
+    "albums": 0,
+    "genres": 42,
+    "composers": 0
+  }
+}

@@ -1,0 +1,18 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 0 24px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

@@ -12,10 +12,16 @@ wheels/
 # Data directory is versioned; local dataset contents and symlinks are not
 data/*
 !data/.gitkeep
+!data/derived/
+data/derived/*
+!data/derived/final/
+data/derived/final/*
+!data/derived/final/README.md
+!data/derived/final/br_*.parquet
+!data/derived/final/br_dataset_manifest.json
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 

@@ -1,0 +1,63 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.card {
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+}
+
+.cover {
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 8px;
+  margin-bottom: 6px;
+}
+
+.year {
+  font-family: var(--mono);
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.title {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tracks {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--ink-4);
+  font-style: italic;
+  padding: 16px;
+  background: var(--bg-2);
+  border-radius: var(--radius-md);
+  text-align: center;
+}

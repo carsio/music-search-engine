@@ -7,6 +7,7 @@ A única fonte oficial do projeto é o Spotify Metadata em
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,8 +16,20 @@ from typing import TypedDict
 import duckdb
 
 DEFAULT_PARQUET_DIR = Path("data/spotify-metadata/spotify_clean_parquet")
+DEFAULT_FINAL_DATASET_DIR = Path("data/derived/final")
+DEFAULT_CURATED_TRACKS_PATH = DEFAULT_FINAL_DATASET_DIR / "br_curated_tracks.parquet"
+DEFAULT_CURATED_LYRICS_PATH = Path("data/derived/lyrics.parquet")
+DEFAULT_CURATED_CORPUS_PATH = DEFAULT_FINAL_DATASET_DIR / "br_curated_lyrics.parquet"
 
 FIELDS: tuple[str, ...] = ("title", "album", "artist")
+CURATED_FIELDS: tuple[str, ...] = (
+    "track_name",
+    "artist_names",
+    "artist_genres",
+    "macro_genre",
+    "album_name",
+    "lyrics",
+)
 
 
 class TrackDocument(TypedDict):
@@ -48,6 +61,229 @@ class RichTrackDocument(TypedDict, total=False):
     album_popularity: int
     duration_ms: int
     explicit: bool
+
+
+class CuratedLyricsDocument(TypedDict, total=False):
+    """Documento consolidado do corpus curado brasileiro com letras."""
+
+    id: str
+    track_name: str
+    primary_artist_name: str
+    artist_names: str
+    artist_genres: str
+    macro_genre: str
+    album_name: str
+    release_date: str
+    release_year: int
+    track_popularity: int
+    duration_ms: int
+    explicit: bool
+    lyrics: str
+    lyrics_source: str
+    lyrics_source_url: str
+
+
+def build_brazilian_lyrics_corpus(
+    output_path: Path = DEFAULT_CURATED_CORPUS_PATH,
+    *,
+    tracks_path: Path = DEFAULT_CURATED_TRACKS_PATH,
+    lyrics_path: Path = DEFAULT_CURATED_LYRICS_PATH,
+    cache_path: Path | None = None,
+) -> Path:
+    """Consolida tracks curadas + letras em um único parquet versionável.
+
+    A fonte de letras preferida é o cache SQLite quando ele existe, porque ele
+    costuma estar mais atualizado do que o parquet exportado. Se o cache não
+    estiver disponível, cai para `lyrics.parquet`.
+    """
+
+    if not tracks_path.exists():
+        raise FileNotFoundError(f"dataset curado ausente: {tracks_path}")
+
+    rows = _load_curated_lyrics_rows(cache_path=cache_path, lyrics_path=lyrics_path)
+    if not rows:
+        raise ValueError("nenhuma letra encontrada para consolidar o corpus curado")
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    con = duckdb.connect()
+    try:
+        con.execute(
+            """
+            CREATE TEMP TABLE lyrics_hits (
+                track_id VARCHAR,
+                isrc VARCHAR,
+                artist VARCHAR,
+                title VARCHAR,
+                source VARCHAR,
+                source_url VARCHAR,
+                lyrics VARCHAR
+            )
+            """
+        )
+        con.executemany("INSERT INTO lyrics_hits VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
+        tracks = tracks_path.as_posix()
+        target = output_path.as_posix()
+        con.execute(
+            f"""
+            COPY (
+                SELECT
+                    t.track_id AS id,
+                    COALESCE(t.track_name, '') AS track_name,
+                    COALESCE(t.primary_artist_name, '') AS primary_artist_name,
+                    COALESCE(t.artist_names, '') AS artist_names,
+                    COALESCE(t.artist_genres, '') AS artist_genres,
+                    COALESCE(t.macro_genre, '') AS macro_genre,
+                    COALESCE(t.album_name, '') AS album_name,
+                    COALESCE(t.release_date, '') AS release_date,
+                    COALESCE(t.release_year, 0) AS release_year,
+                    COALESCE(t.track_popularity, 0) AS track_popularity,
+                    COALESCE(t.duration_ms, 0) AS duration_ms,
+                    COALESCE(t.explicit, FALSE) AS explicit,
+                    COALESCE(h.source, '') AS lyrics_source,
+                    COALESCE(h.source_url, '') AS lyrics_source_url,
+                    COALESCE(h.lyrics, '') AS lyrics
+                FROM '{tracks}' t
+                INNER JOIN lyrics_hits h ON h.track_id = t.track_id
+                WHERE COALESCE(h.lyrics, '') <> ''
+            )
+            TO '{target}' (FORMAT PARQUET, COMPRESSION ZSTD)
+            """
+        )
+    finally:
+        con.close()
+
+    return output_path
+
+
+@dataclass(frozen=True)
+class BrazilianLyricsLoader:
+    """Lê o corpus curado brasileiro consolidado em um doc por música."""
+
+    corpus_path: Path = DEFAULT_CURATED_CORPUS_PATH
+
+    def _query(self, limit: int | None = None) -> str:
+        limit_clause = f"LIMIT {int(limit)}" if limit else ""
+        corpus = self.corpus_path.as_posix()
+        return f"""
+            SELECT
+                id,
+                COALESCE(track_name, '') AS track_name,
+                COALESCE(primary_artist_name, '') AS primary_artist_name,
+                COALESCE(artist_names, '') AS artist_names,
+                COALESCE(artist_genres, '') AS artist_genres,
+                COALESCE(macro_genre, '') AS macro_genre,
+                COALESCE(album_name, '') AS album_name,
+                COALESCE(release_date, '') AS release_date,
+                COALESCE(release_year, 0) AS release_year,
+                COALESCE(track_popularity, 0) AS track_popularity,
+                COALESCE(duration_ms, 0) AS duration_ms,
+                COALESCE(explicit, FALSE) AS explicit,
+                COALESCE(lyrics, '') AS lyrics,
+                COALESCE(lyrics_source, '') AS lyrics_source,
+                COALESCE(lyrics_source_url, '') AS lyrics_source_url
+            FROM '{corpus}'
+            WHERE COALESCE(lyrics, '') <> ''
+            {limit_clause}
+        """
+
+    def iter_docs(self, limit: int | None = None) -> Iterator[CuratedLyricsDocument]:
+        self._ensure_file_exists()
+        con = duckdb.connect()
+        try:
+            cursor = con.execute(self._query(limit))
+            while True:
+                rows = cursor.fetchmany(5_000)
+                if not rows:
+                    break
+                for row in rows:
+                    yield CuratedLyricsDocument(
+                        id=str(row[0]),
+                        track_name=row[1] or "",
+                        primary_artist_name=row[2] or "",
+                        artist_names=row[3] or "",
+                        artist_genres=row[4] or "",
+                        macro_genre=row[5] or "",
+                        album_name=row[6] or "",
+                        release_date=row[7] or "",
+                        release_year=int(row[8] or 0),
+                        track_popularity=int(row[9] or 0),
+                        duration_ms=int(row[10] or 0),
+                        explicit=bool(row[11]),
+                        lyrics=row[12] or "",
+                        lyrics_source=row[13] or "",
+                        lyrics_source_url=row[14] or "",
+                    )
+        finally:
+            con.close()
+
+    def count(self) -> int:
+        self._ensure_file_exists()
+        con = duckdb.connect()
+        try:
+            corpus = self.corpus_path.as_posix()
+            result = con.execute(
+                f"SELECT COUNT(*) FROM '{corpus}' WHERE COALESCE(lyrics, '') <> ''"
+            ).fetchone()
+            return int(result[0]) if result else 0
+        finally:
+            con.close()
+
+    def _ensure_file_exists(self) -> None:
+        if not self.corpus_path.exists():
+            raise FileNotFoundError(
+                f"corpus curado ausente em {self.corpus_path}. "
+                "Gere-o com `uv run python scripts/build_curated_corpus.py`."
+            )
+
+
+def _load_curated_lyrics_rows(
+    *,
+    cache_path: Path | None,
+    lyrics_path: Path,
+) -> list[tuple[str, str | None, str, str, str | None, str | None, str]]:
+    cache = Path(cache_path) if cache_path else Path("data/derived/lyrics_cache.sqlite")
+    if cache.exists():
+        return _load_curated_lyrics_rows_from_cache(cache)
+    if lyrics_path.exists():
+        return _load_curated_lyrics_rows_from_parquet(lyrics_path)
+    raise FileNotFoundError(
+        "nenhuma fonte de letras encontrada: esperado cache SQLite ou lyrics.parquet"
+    )
+
+
+def _load_curated_lyrics_rows_from_cache(
+    cache_path: Path,
+) -> list[tuple[str, str | None, str, str, str | None, str | None, str]]:
+    con = sqlite3.connect(cache_path)
+    try:
+        rows = con.execute(
+            """
+            SELECT track_id, isrc, artist, title, source, source_url, lyrics
+            FROM lyrics
+            WHERE status = 'hit' AND COALESCE(lyrics, '') <> ''
+            """
+        ).fetchall()
+        return [tuple(row) for row in rows]
+    finally:
+        con.close()
+
+
+def _load_curated_lyrics_rows_from_parquet(
+    lyrics_path: Path,
+) -> list[tuple[str, str | None, str, str, str | None, str | None, str]]:
+    con = duckdb.connect()
+    try:
+        query = f"""
+            SELECT track_id, isrc, artist, title, source, source_url, lyrics
+            FROM '{lyrics_path.as_posix()}'
+            WHERE COALESCE(lyrics, '') <> ''
+        """
+        rows = con.execute(query).fetchall()
+        return [tuple(row) for row in rows]
+    finally:
+        con.close()
 
 
 @dataclass(frozen=True)

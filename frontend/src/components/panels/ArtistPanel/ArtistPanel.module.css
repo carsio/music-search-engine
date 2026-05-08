@@ -1,0 +1,113 @@
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--bg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.hero {
+  height: 220px;
+  position: relative;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heroTag {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.55);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.body {
+  padding: 22px;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.title {
+  margin: 4px 0 8px;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  font-size: 14px;
+  color: var(--ink-3);
+  margin-bottom: 12px;
+}
+
+.bio {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  margin: 0 0 18px;
+  line-height: 1.55;
+}
+
+.bioMissing {
+  font-size: 13px;
+  color: var(--ink-4);
+  font-style: italic;
+  margin: 0 0 18px;
+}
+
+.section {
+  margin-top: 18px;
+}
+
+.sectionTitle {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.placeholder {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-4);
+  font-style: italic;
+}
+
+.footer {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-3);
+}
+
+.sourceLink {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  text-decoration: underline;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sourceLink:hover {
+  color: var(--ink);
+}

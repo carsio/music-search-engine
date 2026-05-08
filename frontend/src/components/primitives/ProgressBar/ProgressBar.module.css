@@ -1,0 +1,26 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.bar {
+  flex: 1;
+  height: 6px;
+  background: var(--line-3);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+}
+
+.fill {
+  height: 100%;
+  transition: width 0.3s ease-out;
+}
+
+.num {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-2);
+}

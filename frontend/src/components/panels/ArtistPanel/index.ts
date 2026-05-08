@@ -1,0 +1,1 @@
+export { ArtistPanel } from "./ArtistPanel";

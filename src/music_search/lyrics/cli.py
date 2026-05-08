@@ -16,6 +16,7 @@ from pathlib import Path
 
 import httpx
 
+from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH
 from music_search.lyrics.cache import LyricsCache
 from music_search.lyrics.normalize import normalize_artist, normalize_title
 from music_search.lyrics.pipeline import PipelineConfig, run_pipeline
@@ -23,12 +24,13 @@ from music_search.lyrics.sources import (
     GeniusSource,
     LetrasMusBrSource,
     LrcLibSource,
+    LyricFindSource,
     LyricsOvhSource,
     LyricsSource,
     VagalumeSource,
 )
 
-DEFAULT_PARQUET = Path("data/derived/br_curated_tracks.parquet")
+DEFAULT_PARQUET = DEFAULT_CURATED_TRACKS_PATH
 DEFAULT_CACHE = Path("data/derived/lyrics_cache.sqlite")
 DEFAULT_EXPORT = Path("data/derived/lyrics.parquet")
 
@@ -41,7 +43,8 @@ def _build_sources(client: httpx.AsyncClient) -> list[LyricsSource]:
     2. lrclib (API JSON publica, sem chave, ~3M tracks — cobre internacional/pop).
     3. vagalume (API JSON, opt-in via VAGALUME_API_KEY — instavel atualmente).
     4. lyrics.ovh (publico, fallback simples).
-    5. genius (API com GENIUS_TOKEN; sem token usa endpoint publico de busca).
+    5. lyricfind (scraping HTML do player publico, cobre catalogo licenciado).
+    6. genius (API com GENIUS_TOKEN; sem token usa endpoint publico de busca).
     """
     sources: list[LyricsSource] = [
         LetrasMusBrSource(client),
@@ -53,6 +56,7 @@ def _build_sources(client: httpx.AsyncClient) -> list[LyricsSource]:
         sources.append(VagalumeSource(client, api_key=vagalume_key))
 
     sources.append(LyricsOvhSource(client))
+    sources.append(LyricFindSource(client))
 
     # Genius funciona com ou sem token. Com token = mais quota e estabilidade;
     # sem token = endpoint publico do site (cota menor, sujeito a Cloudflare).
