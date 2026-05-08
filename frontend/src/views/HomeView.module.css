@@ -3,8 +3,8 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: var(--space-6);
-  padding: var(--space-6) 0 var(--space-7);
+  gap: var(--space-5);
+  padding: var(--space-5) 0;
   background:
     radial-gradient(circle at 20% 10%, color-mix(in oklab, var(--accent) 18%, transparent), transparent 50%),
     radial-gradient(circle at 90% 80%, color-mix(in oklab, var(--accent) 12%, transparent), transparent 50%),
