@@ -360,6 +360,8 @@ painel de artefatos gerados (`br_*.parquet` e `br_dataset_manifest.json`).
 
 `tasks.json` hoje expõe:
 
+- `backend: prepare search artifacts`
+- `backend: ready`
 - `backend: dev`
 - `frontend: dev`
 - `dev: full stack`
