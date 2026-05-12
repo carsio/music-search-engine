@@ -283,7 +283,7 @@ def _needs_fetch(row: dict[str, Any] | None, *, retry_errors: bool) -> bool:
 
 
 def _needs_normalize(row: dict[str, Any] | None, *, retry_errors: bool) -> bool:
-    if _raw_content_from_row(row) is None:
+    if row is None or _raw_content_from_row(row) is None:
         return False
 
     status = str(row.get("status") or "")

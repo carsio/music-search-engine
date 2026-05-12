@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 from fastapi import HTTPException
@@ -78,7 +79,7 @@ def _album_catalog() -> dict[str, AlbumDocument]:
 
 
 def test_album_response_from_payload_converte_sidebar_e_tracklist() -> None:
-    response = _album_response_from_payload(_album_catalog()["album-1"])
+    response = _album_response_from_payload(cast(dict[str, Any], _album_catalog()["album-1"]))
 
     assert response.id == "album-1"
     assert response.artist_summary.name == "Artista A"

@@ -160,7 +160,7 @@ def _opt_int(v: object) -> int | None:
     if v is None or v == "":
         return None
     try:
-        return int(v)  # type: ignore[arg-type]
+        return int(v)  # ty: ignore[invalid-argument-type]
     except (TypeError, ValueError):
         return None
 

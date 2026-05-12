@@ -73,7 +73,8 @@ def _count_records(parquet: Path) -> int:
 
     con = duckdb.connect()
     try:
-        return int(con.execute(f"SELECT COUNT(*) FROM '{parquet.as_posix()}'").fetchone()[0])
+        row = con.execute(f"SELECT COUNT(*) FROM '{parquet.as_posix()}'").fetchone()
+        return int(row[0]) if row else 0
     finally:
         con.close()
 
