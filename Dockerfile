@@ -29,10 +29,11 @@ RUN pip install --upgrade pip \
     && pip install ".[lyrics]" \
     && python -m nltk.downloader -d "$NLTK_DATA" punkt_tab stopwords rslp
 
-# Pre-computa o índice esparso no build para evitar 5–10 min de CPU
-# no primeiro boot do container. O .pkl resultante é serializado em
-# data/indexes/ e reaproveitado em runtime via load_or_build_default_engine.
-RUN python -c "from music_search.motors.search import load_or_build_default_engine; load_or_build_default_engine()"
+# Pre-computa o índice esparso de tracks + os índices de entidades
+# (artist/album/genre/composer) durante o build para evitar 5–10 min
+# de CPU no primeiro boot do container. Os .pkl gerados ficam em
+# data/indexes/ e são reaproveitados em runtime via _can_reuse_index.
+RUN python -m music_search.scripts.prepare_search_artifacts
 
 EXPOSE 8000
 
