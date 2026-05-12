@@ -208,7 +208,9 @@ def test_search_lyric_respeita_max_snippets_e_parametros_avancados() -> None:
                     artist_names="Duo Mar",
                     primary_artist_name="Duo Mar",
                     score=1.0,
-                    lyrics="Neblina no cais\nNoite sem farol\nNeblina volta cedo\nCidade acorda lenta",
+                    lyrics=(
+                        "Neblina no cais\nNoite sem farol\nNeblina volta cedo\nCidade acorda lenta"
+                    ),
                 )
             ]
 

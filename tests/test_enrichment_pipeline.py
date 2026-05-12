@@ -65,8 +65,7 @@ def test_run_enrichment_materializes_artist_payload_without_llm(tmp_path: Path) 
         assert payload["tagline"] == "Gilberto Gil e cantor e compositor brasileiro."
         assert payload["bio"] == "Gilberto Gil e cantor e compositor brasileiro."
         assert payload["raw_text"] == (
-            "Gilberto Gil e cantor e compositor brasileiro.\n\n"
-            "Carreira. Gravou discos marcantes."
+            "Gilberto Gil e cantor e compositor brasileiro.\n\nCarreira. Gravou discos marcantes."
         )
         assert payload["source"] == "wikipedia_pt"
         assert payload["source_url"] == source_url
@@ -92,8 +91,7 @@ def test_export_kind_preserves_raw_text_column(tmp_path: Path) -> None:
             "name": "Tropicália",
             "description": "Movimento cultural brasileiro.",
             "raw_text": (
-                "Movimento cultural brasileiro.\n\n"
-                "Contexto. Mistura musica e artes visuais."
+                "Movimento cultural brasileiro.\n\nContexto. Mistura musica e artes visuais."
             ),
             "origin": None,
             "decade": None,

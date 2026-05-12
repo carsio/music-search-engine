@@ -155,7 +155,9 @@ def _macro_genre_seeds(path: Path = DEFAULT_TRACKS_PATH, limit: int | None = Non
         con.close()
 
 
-def _expanded_genre_seeds(path: Path = DEFAULT_TRACKS_PATH, limit: int | None = None) -> Iterator[str]:
+def _expanded_genre_seeds(
+    path: Path = DEFAULT_TRACKS_PATH, limit: int | None = None
+) -> Iterator[str]:
     con = _connect_view(path)
     try:
         counts: Counter[str] = Counter()

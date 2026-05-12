@@ -21,9 +21,7 @@ def main() -> None:
     multi = MultiEntityIndex.from_parquets(track_engine=None)
     after_entities = time.perf_counter()
 
-    entity_counts = {
-        kind: index.num_docs for kind, index in sorted(multi.entity_indexes.items())
-    }
+    entity_counts = {kind: index.num_docs for kind, index in sorted(multi.entity_indexes.items())}
     print(
         f"[prepare_search_artifacts] tracks: {track_engine.num_docs} docs "
         f"({after_tracks - start:.1f}s)"
