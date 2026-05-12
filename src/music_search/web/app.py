@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    started = time.time()
     logger.info("Carregando motor de busca esparso...")
     track_engine = load_or_build_default_engine()
     logger.info("Indice de tracks: %d docs", track_engine.num_docs)
@@ -59,8 +60,23 @@ async def lifespan(app: FastAPI):
         {k: v.num_docs for k, v in multi.entity_indexes.items()},
     )
 
+    # Warmup: força os lazy loads do NLTK (punkt, stopwords, RSLP) e
+    # exercita o caminho completo de busca uma vez. Sem isso, a primeira
+    # request paga ~60 s de inicialização no VPS de 1 vCPU porque cada
+    # recurso do NLTK só carrega quando usado.
+    warmup_started = time.time()
+    try:
+        track_engine.search("amor saudade", algorithm="bm25", top_k=1)
+        for kind, idx in multi.entity_indexes.items():
+            idx.search("amor", algorithm="bm25", top_k=1)
+            _ = kind  # only for clarity
+    except Exception as exc:
+        logger.warning("Warmup falhou (segue mesmo assim): %s", exc)
+    logger.info("Warmup concluído em %.1fs", time.time() - warmup_started)
+
     app.state.track_engine = track_engine
     app.state.multi = multi
+    logger.info("Lifespan startup total: %.1fs", time.time() - started)
     yield
 
 
