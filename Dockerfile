@@ -22,8 +22,8 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 COPY data/derived/final ./data/derived/final
-COPY data/indexes ./data/indexes
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+RUN mkdir -p ./data/indexes
 
 RUN pip install --upgrade pip \
     && pip install ".[lyrics]" \
