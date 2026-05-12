@@ -234,7 +234,7 @@ class BrazilianLyricsLoader:
         if not self.corpus_path.exists():
             raise FileNotFoundError(
                 f"corpus curado ausente em {self.corpus_path}. "
-                "Gere-o com `uv run python scripts/build_curated_corpus.py`."
+                "Gere-o com `uv run python -m music_search.scripts.build_curated_corpus`."
             )
 
 
@@ -421,5 +421,5 @@ class SpotifyTracksLoader:
         if missing:
             raise FileNotFoundError(
                 f"parquets ausentes em {self.parquet_dir}: {missing}. "
-                "Rode `./scripts/download_spotify_metadata.sh --truncated`."
+                "Rode `./src/music_search/scripts/download_spotify_metadata.sh --truncated`."
             )

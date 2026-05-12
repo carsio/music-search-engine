@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from music_search.albums import AlbumDocument
-from music_search.multi_index import EntityIndex, MultiEntityIndex
+from music_search.data.albums import AlbumDocument
+from music_search.motors.multi_index import EntityIndex, MultiEntityIndex
 from music_search.web.app import (
     _album_response_from_payload,
     app,
@@ -78,7 +79,7 @@ def _album_catalog() -> dict[str, AlbumDocument]:
 
 
 def test_album_response_from_payload_converte_sidebar_e_tracklist() -> None:
-    response = _album_response_from_payload(_album_catalog()["album-1"])
+    response = _album_response_from_payload(cast(dict[str, Any], _album_catalog()["album-1"]))
 
     assert response.id == "album-1"
     assert response.artist_summary.name == "Artista A"
@@ -208,7 +209,9 @@ def test_search_lyric_respeita_max_snippets_e_parametros_avancados() -> None:
                     artist_names="Duo Mar",
                     primary_artist_name="Duo Mar",
                     score=1.0,
-                    lyrics="Neblina no cais\nNoite sem farol\nNeblina volta cedo\nCidade acorda lenta",
+                    lyrics=(
+                        "Neblina no cais\nNoite sem farol\nNeblina volta cedo\nCidade acorda lenta"
+                    ),
                 )
             ]
 

@@ -7,8 +7,8 @@ from typing import cast
 
 import pytest
 
-from music_search.indexer import InvertedIndex, build_index
-from music_search.ranking import BM25, TFIDF, TfScheme, bm25_idf, tf_weight, tfidf_idf
+from music_search.core.indexer import InvertedIndex, build_index
+from music_search.core.ranking import BM25, TFIDF, TfScheme, bm25_idf, tf_weight, tfidf_idf
 
 
 def _make_index() -> InvertedIndex:

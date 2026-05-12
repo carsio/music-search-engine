@@ -1,14 +1,14 @@
 """Pré-constrói os índices persistidos de entidades não-track.
 
 Uso:
-    uv run python scripts/build_entity_indexes.py
+    uv run python -m music_search.scripts.build_entity_indexes
 """
 
 from __future__ import annotations
 
 import time
 
-from music_search.multi_index import DEFAULT_ENTITY_INDEX_PATHS, MultiEntityIndex
+from music_search.motors.multi_index import DEFAULT_ENTITY_INDEX_PATHS, MultiEntityIndex
 
 
 def main() -> None:

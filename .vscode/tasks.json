@@ -24,15 +24,60 @@
         ],
         "background": {
           "activeOnStart": true,
-          "beginsPattern": ".*Started server process.*|.*Will watch for changes.*",
-          "endsPattern": ".*Application startup complete.*|.*Uvicorn running on.*"
+          "beginsPattern": ".*Started server process.*|.*Waiting for application startup.*",
+          "endsPattern": ".*Application startup complete.*"
         }
       }
+    },
+    {
+      "label": "backend: prepare search artifacts",
+      "type": "shell",
+      "command": "uv run python -m music_search.scripts.prepare_search_artifacts",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "group": "dev",
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "backend: ready",
+      "dependsOn": ["backend: prepare search artifacts", "backend: dev"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend: ensure deps",
+      "type": "shell",
+      "command": "if [ ! -x node_modules/.bin/vite ]; then npm install; fi",
+      "windows": {
+        "command": "if (-not (Test-Path 'node_modules/.bin/vite.cmd')) { npm install }"
+      },
+      "linux": {
+        "command": "if [ ! -x node_modules/.bin/vite ]; then npm install; fi"
+      },
+      "osx": {
+        "command": "if [ ! -x node_modules/.bin/vite ]; then npm install; fi"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "group": "dev",
+        "reveal": "always"
+      },
+      "problemMatcher": []
     },
     {
       "label": "frontend: dev",
       "type": "shell",
       "command": "npm run dev",
+      "dependsOn": ["frontend: ensure deps"],
+      "dependsOrder": "sequence",
       "options": {
         "cwd": "${workspaceFolder}/frontend"
       },
@@ -59,8 +104,8 @@
     },
     {
       "label": "dev: full stack",
-      "dependsOn": ["backend: dev", "frontend: dev"],
-      "dependsOrder": "parallel",
+      "dependsOn": ["backend: ready", "frontend: dev"],
+      "dependsOrder": "sequence",
       "group": {
         "kind": "build",
         "isDefault": true

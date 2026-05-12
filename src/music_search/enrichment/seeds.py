@@ -9,8 +9,8 @@ from typing import Literal
 
 import duckdb
 
-from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH
-from music_search.preprocessing import normalize
+from music_search.core.preprocessing import normalize
+from music_search.data.datasets import DEFAULT_CURATED_TRACKS_PATH
 
 DEFAULT_TRACKS_PATH = DEFAULT_CURATED_TRACKS_PATH
 
@@ -71,8 +71,8 @@ _GENRE_SEED_SYNONYMS: dict[str, str] = {
 def _connect_view(path: Path) -> duckdb.DuckDBPyConnection:
     if not path.exists():
         raise FileNotFoundError(
-            f"corpus de tracks ausente em {path}. Rode `uv run python "
-            "scripts/build_curated_corpus.py` (ou apenas o passo de tracks)."
+            f"corpus de tracks ausente em {path}. Rode `uv run python -m "
+            "music_search.scripts.build_curated_corpus` (ou apenas o passo de tracks)."
         )
     con = duckdb.connect()
     con.execute(f"CREATE VIEW tracks AS SELECT * FROM '{path.as_posix()}'")
@@ -155,7 +155,9 @@ def _macro_genre_seeds(path: Path = DEFAULT_TRACKS_PATH, limit: int | None = Non
         con.close()
 
 
-def _expanded_genre_seeds(path: Path = DEFAULT_TRACKS_PATH, limit: int | None = None) -> Iterator[str]:
+def _expanded_genre_seeds(
+    path: Path = DEFAULT_TRACKS_PATH, limit: int | None = None
+) -> Iterator[str]:
     con = _connect_view(path)
     try:
         counts: Counter[str] = Counter()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-from music_search.preprocessing import preprocess
+from music_search.core.preprocessing import preprocess
 
 
 def query_terms(query: str) -> set[str]:
@@ -57,9 +57,7 @@ def extract_snippets(
             start = max(0, idx - context)
             end = min(len(raw_lines), idx + context + 1)
             text = " / ".join(
-                raw_lines[j].strip()
-                for j in range(start, end)
-                if raw_lines[j].strip()
+                raw_lines[j].strip() for j in range(start, end) if raw_lines[j].strip()
             )
         else:
             text = raw_lines[idx].strip()

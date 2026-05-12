@@ -19,12 +19,12 @@ import re
 
 import httpx
 
-from music_search.lyrics.sources.base import LyricsResult, Status
-from music_search.lyrics.throttle import (
+from music_search._async_http.throttle import (
     AsyncRateLimiter,
     CircuitBreaker,
     parse_retry_after,
 )
+from music_search.lyrics.sources.base import LyricsResult, Status
 
 _TIMESTAMP_RE = re.compile(r"^\s*\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]\s*")
 

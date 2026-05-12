@@ -30,10 +30,10 @@ faixas com filtros conservadores (`per_artist_cap=5`, `top_k_per_bucket=250`,
 Uso
 ---
     # Gera ate 50k faixas (default)
-    uv run python scripts/expand_dataset.py
+    uv run python -m music_search.scripts.expand_dataset
 
     # Customizando
-    uv run python scripts/expand_dataset.py \\
+    uv run python -m music_search.scripts.expand_dataset \\
         --target 50000 \\
         --per-artist-cap 50 \\
         --top-k-per-bucket 5000 \\
@@ -41,7 +41,7 @@ Uso
         --output data/derived/final/br_curated_tracks.parquet
 
     # Dry-run para inspecionar contagens sem escrever o parquet
-    uv run python scripts/expand_dataset.py --dry-run
+    uv run python -m music_search.scripts.expand_dataset --dry-run
 
 Apos rodar, retome o pipeline de letras:
     uv run python -m music_search.lyrics fetch --concurrency 4
@@ -55,7 +55,7 @@ from pathlib import Path
 
 import duckdb
 
-from music_search.datasets import DEFAULT_CURATED_TRACKS_PATH
+from music_search.data.datasets import DEFAULT_CURATED_TRACKS_PATH
 
 # Reutilizamos os mesmos termos / regex do notebook 04 para manter coerencia
 # sobre o que conta como "musica brasileira".
@@ -225,7 +225,7 @@ def main() -> None:
     if missing:
         raise FileNotFoundError(
             "Arquivos ausentes em "
-            f"{args.clean_dir}. Rode `./scripts/download_spotify_metadata.sh --truncated` "
+            f"{args.clean_dir}. Rode `./src/music_search/scripts/download_spotify_metadata.sh --truncated` "
             "ou `--full`.\n" + "\n".join(str(p) for p in missing)
         )
 

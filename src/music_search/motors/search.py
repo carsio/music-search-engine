@@ -17,15 +17,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from music_search.datasets import (
+from music_search.core.indexer import IndexBuilder, InvertedIndex
+from music_search.core.ranking import BM25, TFIDF, TfScheme
+from music_search.data.datasets import (
     CURATED_FIELDS,
     DEFAULT_CURATED_CORPUS_PATH,
     BrazilianLyricsLoader,
     CuratedLyricsDocument,
 )
-from music_search.indexer import IndexBuilder, InvertedIndex
-from music_search.ranking import BM25, TFIDF, TfScheme
-from music_search.search_tuning import SearchProfile, track_weights_for_profile
+from music_search.motors.tuning import SearchProfile, track_weights_for_profile
 
 SearchAlgorithm = Literal["bm25", "tfidf"]
 
@@ -371,8 +371,15 @@ def load_or_build_default_engine(
     weights = dict(field_weights or DEFAULT_FIELD_WEIGHTS)
 
     if not rebuild_index and _can_reuse_index(index_path=index_path, corpus_path=corpus_path):
-        index = InvertedIndex.load(index_path)
-        return SparseSearchEngine(index=index, documents=documents, field_weights=weights)
+        try:
+            index = InvertedIndex.load(index_path)
+        except ModuleNotFoundError:
+            # Pickle de versão anterior ao re-layout (importava music_search.indexer
+            # direto). Reconstrói transparentemente — o usuário não precisa lembrar
+            # de passar --rebuild-index após um pull.
+            pass
+        else:
+            return SparseSearchEngine(index=index, documents=documents, field_weights=weights)
 
     engine = SparseSearchEngine.build(documents.values(), field_weights=weights)
     engine.save_index(index_path)

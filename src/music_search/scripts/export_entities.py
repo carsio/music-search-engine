@@ -1,8 +1,10 @@
 """Le `enrichment_cache.sqlite` e exporta um parquet por entidade.
 
 Uso:
-    uv run python scripts/export_entities.py [--kinds artist,album,genre,composer]
-    uv run python scripts/export_entities.py --kinds artist --output-dir data/derived/final
+    uv run python -m music_search.scripts.export_entities \\
+        [--kinds artist,album,genre,composer]
+    uv run python -m music_search.scripts.export_entities \\
+        --kinds artist --output-dir data/derived/final
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from music_search.datasets import DEFAULT_FINAL_DATASET_DIR
+from music_search.data.datasets import DEFAULT_FINAL_DATASET_DIR
 from music_search.enrichment.pipeline import (
     DEFAULT_CACHE_PATH,
     DEFAULT_CACHE_TABLE,
@@ -158,7 +160,7 @@ def _opt_int(v: object) -> int | None:
     if v is None or v == "":
         return None
     try:
-        return int(v)  # type: ignore[arg-type]
+        return int(v)  # ty: ignore[invalid-argument-type]
     except (TypeError, ValueError):
         return None
 

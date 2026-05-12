@@ -5,7 +5,7 @@ from pathlib import Path
 
 import duckdb
 
-from music_search.datasets import BrazilianLyricsLoader, build_brazilian_lyrics_corpus
+from music_search.data.datasets import BrazilianLyricsLoader, build_brazilian_lyrics_corpus
 
 
 def _write_tracks_parquet(path: Path) -> None:

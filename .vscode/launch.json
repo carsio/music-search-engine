@@ -26,6 +26,7 @@
       "name": "Frontend · Vite (npm run dev)",
       "type": "node",
       "request": "launch",
+      "preLaunchTask": "frontend: ensure deps",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "cwd": "${workspaceFolder}/frontend",

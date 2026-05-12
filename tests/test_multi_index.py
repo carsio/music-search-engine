@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import duckdb
 
-from music_search.albums import AlbumDocument
-from music_search.datasets import CuratedLyricsDocument
-from music_search.multi_index import EntityIndex, MultiEntityIndex, _load_or_build_entity_index
-from music_search.search import SparseSearchEngine
+from music_search.data.albums import AlbumDocument
+from music_search.data.datasets import CuratedLyricsDocument
+from music_search.motors.multi_index import (
+    EntityIndex,
+    MultiEntityIndex,
+    _load_or_build_entity_index,
+)
+from music_search.motors.search import SparseSearchEngine
 
 
 def _make_track_engine() -> SparseSearchEngine:

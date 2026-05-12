@@ -16,25 +16,27 @@ import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from music_search.multi_index import MultiEntityIndex
-from music_search.ranking import TfScheme
-from music_search.search import SparseSearchEngine, load_or_build_default_engine
-from music_search.search_tuning import SearchProfile
+from music_search.core.ranking import TfScheme
+from music_search.motors.multi_index import MultiEntityIndex
+from music_search.motors.search import SparseSearchEngine, load_or_build_default_engine
+from music_search.motors.tuning import SearchProfile
 from music_search.web.schemas import (
     AlbumArtistSummary,
     AlbumRef,
     AlbumResponse,
     AlbumTrack,
     ArtistResponse,
+    Intent,
     LyricMatch,
     LyricSearchResponse,
     LyricSnippet,
+    SearchAlgorithm,
     SearchResponse,
     SearchResultItem,
     SongResponse,
@@ -308,9 +310,9 @@ async def search(
     elapsed = int((time.time() - started) * 1000)
     return SearchResponse(
         query=q,
-        intent_requested=intent,  # type: ignore[arg-type]
-        intent_used=intent_used,  # type: ignore[arg-type]
-        algorithm=algorithm,  # type: ignore[arg-type]
+        intent_requested=cast(Intent, intent),
+        intent_used=cast(Intent, intent_used),
+        algorithm=cast(SearchAlgorithm, algorithm),
         items=hits,
         rerank_used=rerank_used,
         elapsed_ms=elapsed,
@@ -332,7 +334,7 @@ def search_lyric(
     engine: SparseSearchEngine = app.state.track_engine
     hits = engine.search(
         q,
-        algorithm=algorithm,  # type: ignore[arg-type]
+        algorithm=cast(SearchAlgorithm, algorithm),
         top_k=top,
         profile=profile,
         bm25_k1=bm25_k1,
@@ -353,7 +355,7 @@ def search_lyric(
         )
     return LyricSearchResponse(
         query=q,
-        algorithm=algorithm,  # type: ignore[arg-type]
+        algorithm=cast(SearchAlgorithm, algorithm),
         matches=matches,
         elapsed_ms=int((time.time() - started) * 1000),
     )

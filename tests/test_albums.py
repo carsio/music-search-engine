@@ -4,7 +4,7 @@ from pathlib import Path
 
 import duckdb
 
-from music_search.albums import build_album_search_records, load_album_catalog_from_tracks
+from music_search.data.albums import build_album_search_records, load_album_catalog_from_tracks
 
 
 def _write_tracks_parquet(path: Path) -> None:
@@ -58,35 +58,35 @@ def _write_tracks_parquet(path: Path) -> None:
 
 
 def test_load_album_catalog_from_tracks_agrega_e_ordena(tmp_path: Path) -> None:
-    tracks = tmp_path / 'tracks.parquet'
+    tracks = tmp_path / "tracks.parquet"
     _write_tracks_parquet(tracks)
 
     catalog = load_album_catalog_from_tracks(tracks)
 
-    assert set(catalog) == {'album-1', 'album-sem-id-artista-b-2023'}
-    album = catalog['album-1']
-    assert album['title'] == 'Raizes do Norte'
-    assert album['artist'] == 'Artista A'
-    assert album['year'] == 2024
-    assert album['tracks_count'] == 2
-    assert album['cover_url'] == 'https://example.test/album.jpg'
-    assert album['tags'] == ['mpb', 'samba']
-    assert [track['id'] for track in album['tracks']] == ['trk-1', 'trk-2']
-    assert album['tracks'][0]['duration'] == '3:20'
-    assert album['description'].startswith('Raizes do Norte: Album de Artista A')
-    assert album['artist_summary']['id'] == 'artist-1'
-    assert [track['id'] for track in album['artist_summary']['top_tracks']] == ['trk-1', 'trk-2']
+    assert set(catalog) == {"album-1", "album-sem-id-artista-b-2023"}
+    album = catalog["album-1"]
+    assert album["title"] == "Raizes do Norte"
+    assert album["artist"] == "Artista A"
+    assert album["year"] == 2024
+    assert album["tracks_count"] == 2
+    assert album["cover_url"] == "https://example.test/album.jpg"
+    assert album["tags"] == ["mpb", "samba"]
+    assert [track["id"] for track in album["tracks"]] == ["trk-1", "trk-2"]
+    assert album["tracks"][0]["duration"] == "3:20"
+    assert album["description"].startswith("Raizes do Norte: Album de Artista A")
+    assert album["artist_summary"]["id"] == "artist-1"
+    assert [track["id"] for track in album["artist_summary"]["top_tracks"]] == ["trk-1", "trk-2"]
 
 
 def test_build_album_search_records_reduz_payload(tmp_path: Path) -> None:
-    tracks = tmp_path / 'tracks.parquet'
+    tracks = tmp_path / "tracks.parquet"
     _write_tracks_parquet(tracks)
 
     catalog = load_album_catalog_from_tracks(tracks)
     records = build_album_search_records(catalog.values())
 
-    record = next(item for item in records if item['id'] == 'album-1')
-    assert record['title'] == 'Raizes do Norte'
-    assert record['tracks_count'] == 2
-    assert record['cover_url'] == 'https://example.test/album.jpg'
-    assert 'tracks' not in record
+    record = next(item for item in records if item["id"] == "album-1")
+    assert record["title"] == "Raizes do Norte"
+    assert record["tracks_count"] == 2
+    assert record["cover_url"] == "https://example.test/album.jpg"
+    assert "tracks" not in record
