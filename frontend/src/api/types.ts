@@ -18,7 +18,6 @@ export interface SearchResponse {
   intent_used: Intent;
   algorithm: SearchAlgorithm;
   items: SearchResultItem[];
-  rerank_used: boolean;
   elapsed_ms: number;
 }
 
@@ -135,5 +134,4 @@ export interface HealthResponse {
   ok: boolean;
   tracks_indexed: number;
   entities: Record<string, number>;
-  llm: boolean;
 }

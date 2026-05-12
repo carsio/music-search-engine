@@ -61,6 +61,11 @@
   margin: 0;
   color: var(--ink-3);
   font-size: 14px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .taglineMono {
@@ -70,7 +75,6 @@
   border: 1px solid var(--line-2);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
-  margin-left: 8px;
 }
 
 .search {
@@ -83,6 +87,32 @@
     font-size: 64px;
   }
   .hero {
-    padding: 20px;
+    padding: 24px 20px 0;
+  }
+  .mark {
+    width: 72px;
+    height: 72px;
+  }
+  .search {
+    margin-top: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .title {
+    font-size: 52px;
+  }
+  .mark {
+    width: 64px;
+    height: 64px;
+  }
+  .hero {
+    padding: 16px 16px 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .title {
+    font-size: 44px;
   }
 }

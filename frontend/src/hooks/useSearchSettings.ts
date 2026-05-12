@@ -8,7 +8,6 @@ export type SearchTfScheme = "raw" | "log" | "augmented";
 export interface SearchSettings {
   algorithm: SearchAlgorithm;
   top: number;
-  rerank: boolean;
   profile: SearchProfile;
   bm25K1: number;
   bm25B: number;
@@ -21,7 +20,6 @@ const STORAGE_KEY = "music-search:search-settings";
 const PARAMS = {
   algorithm: "algo",
   top: "top",
-  rerank: "rerank",
   profile: "profile",
   bm25K1: "k1",
   bm25B: "b",
@@ -32,7 +30,6 @@ const PARAMS = {
 export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
   algorithm: "bm25",
   top: 10,
-  rerank: false,
   profile: "balanced",
   bm25K1: 1.5,
   bm25B: 0.75,
@@ -80,13 +77,6 @@ function parseFloatParam(
   return clamp(parsed, min, max);
 }
 
-function parseBooleanParam(value: string | null | undefined, fallback: boolean) {
-  if (!value) return fallback;
-  if (value === "1" || value === "true") return true;
-  if (value === "0" || value === "false") return false;
-  return fallback;
-}
-
 function readStoredSettings(): Partial<SearchSettings> {
   if (typeof window === "undefined") {
     return {};
@@ -103,7 +93,6 @@ function readStoredSettings(): Partial<SearchSettings> {
         typeof parsed.top === "number"
           ? clamp(Math.round(parsed.top), 1, 50)
           : undefined,
-      rerank: typeof parsed.rerank === "boolean" ? parsed.rerank : undefined,
       profile: isProfile(parsed.profile) ? parsed.profile : undefined,
       bm25K1:
         typeof parsed.bm25K1 === "number"
@@ -138,10 +127,6 @@ function resolveSettings(params: URLSearchParams): SearchSettings {
       stored.top ?? DEFAULT_SEARCH_SETTINGS.top,
       1,
       50,
-    ),
-    rerank: parseBooleanParam(
-      params.get(PARAMS.rerank),
-      stored.rerank ?? DEFAULT_SEARCH_SETTINGS.rerank,
     ),
     profile: isProfile(profileParam)
       ? profileParam
@@ -183,7 +168,6 @@ export function useSearchSettings() {
   const hasActiveOverrides =
     settings.algorithm !== DEFAULT_SEARCH_SETTINGS.algorithm ||
     settings.top !== DEFAULT_SEARCH_SETTINGS.top ||
-    settings.rerank !== DEFAULT_SEARCH_SETTINGS.rerank ||
     settings.profile !== DEFAULT_SEARCH_SETTINGS.profile ||
     settings.bm25K1 !== DEFAULT_SEARCH_SETTINGS.bm25K1 ||
     settings.bm25B !== DEFAULT_SEARCH_SETTINGS.bm25B ||
@@ -202,7 +186,6 @@ export function useSearchSettings() {
         const updated = new URLSearchParams(prev);
         updated.set(PARAMS.algorithm, next.algorithm);
         updated.set(PARAMS.top, String(next.top));
-        updated.set(PARAMS.rerank, next.rerank ? "1" : "0");
         updated.set(PARAMS.profile, next.profile);
         updated.set(PARAMS.bm25K1, String(next.bm25K1));
         updated.set(PARAMS.bm25B, String(next.bm25B));
@@ -222,7 +205,6 @@ export function useSearchSettings() {
       const updated = new URLSearchParams(prev);
       updated.delete(PARAMS.algorithm);
       updated.delete(PARAMS.top);
-      updated.delete(PARAMS.rerank);
       updated.delete(PARAMS.profile);
       updated.delete(PARAMS.bm25K1);
       updated.delete(PARAMS.bm25B);

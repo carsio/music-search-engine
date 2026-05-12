@@ -26,6 +26,12 @@
   font-size: 12px;
 }
 
+@media (pointer: coarse) {
+  .sm {
+    min-height: 40px;
+  }
+}
+
 .md {
   height: 40px;
   padding: 0 16px;

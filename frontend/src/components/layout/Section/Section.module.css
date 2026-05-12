@@ -6,6 +6,8 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   margin: 28px 0 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--line-2);
@@ -25,4 +27,16 @@
   color: var(--ink-3);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+@media (max-width: 640px) {
+  .section {
+    margin-bottom: 24px;
+  }
+  .head {
+    margin: 20px 0 10px;
+  }
+  .title {
+    font-size: 18px;
+  }
 }

@@ -45,7 +45,6 @@ export function ArtistView({ query, response, artist, isEnriching, onSubmit }: A
           <Tag variant="ri">
             latência: <code>{response.elapsed_ms}ms</code>
           </Tag>
-          {response.rerank_used ? <Tag variant="ri">LLM rerank</Tag> : null}
         </div>
       </Card>
 

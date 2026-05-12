@@ -20,6 +20,19 @@
   }
 }
 
+@media (max-width: 640px) {
+  .layout {
+    padding: 16px 16px 56px;
+    gap: 24px;
+  }
+}
+
+@media (max-width: 380px) {
+  .layout {
+    padding: 12px 12px 48px;
+  }
+}
+
 .main {
   min-width: 0;
 }

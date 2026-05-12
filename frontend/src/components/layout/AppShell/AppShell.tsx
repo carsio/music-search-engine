@@ -22,7 +22,6 @@ export function AppShell() {
           label: k,
           value: formatNumber(v),
         })),
-        { label: "llm", value: health.data.llm ? "ativa" : "off" },
       ]
     : undefined;
 
@@ -33,7 +32,6 @@ export function AppShell() {
       hasActiveOverrides={hasActiveOverrides}
       onUpdate={updateSettings}
       onReset={resetSettings}
-      rerankAvailable={Boolean(health.data?.llm)}
     />
   );
 

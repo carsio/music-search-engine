@@ -40,6 +40,18 @@
   text-align: left;
   transition: all var(--transition-fast);
   min-width: 160px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .related {
+    min-width: 0;
+    width: 100%;
+  }
+  .chip {
+    padding: 8px 14px;
+  }
 }
 
 .related:hover {

@@ -1,8 +1,10 @@
 .app {
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 .main {
   animation: fadeIn 0.25s ease-out;
+  min-width: 0;
 }

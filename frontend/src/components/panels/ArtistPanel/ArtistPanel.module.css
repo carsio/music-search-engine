@@ -15,6 +15,18 @@
   justify-content: center;
 }
 
+@media (max-width: 640px) {
+  .hero {
+    height: 140px;
+  }
+  .body {
+    padding: 18px;
+  }
+  .title {
+    font-size: 30px;
+  }
+}
+
 .heroTag {
   font-family: var(--mono);
   font-size: 10px;
@@ -45,6 +57,7 @@
   font-size: 38px;
   line-height: 1.05;
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
 }
 
 .tagline {

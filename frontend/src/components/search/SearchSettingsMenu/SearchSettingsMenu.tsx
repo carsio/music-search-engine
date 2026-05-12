@@ -15,7 +15,6 @@ interface SearchSettingsMenuProps {
   hasActiveOverrides: boolean;
   onUpdate: (patch: Partial<SearchSettings>) => void;
   onReset: () => void;
-  rerankAvailable: boolean;
 }
 
 const PROFILE_COPY: Record<SearchProfile, { title: string; sub: string }> = {
@@ -48,7 +47,6 @@ export function SearchSettingsMenu({
   hasActiveOverrides,
   onUpdate,
   onReset,
-  rerankAvailable,
 }: SearchSettingsMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -72,9 +70,19 @@ export function SearchSettingsMenu({
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+
+    // Lock body scroll only when the panel is rendered as a full-screen
+    // sheet on small screens — avoids the awkward double-scroll on iOS.
+    const isMobileSheet =
+      typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
+    const previousOverflow = document.body.style.overflow;
+    if (isMobileSheet) {
+      document.body.style.overflow = "hidden";
+    }
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
     };
   }, [open]);
 
@@ -148,23 +156,6 @@ export function SearchSettingsMenu({
                 step={1}
                 value={settings.top}
                 onChange={(event) => onUpdate({ top: Number(event.target.value) })}
-              />
-            </label>
-
-            <label className={styles.toggleRow}>
-              <span className={styles.toggleCopy}>
-                <span className={styles.toggleTitle}>Rerank com LLM</span>
-                <span className={styles.toggleHint}>
-                  {rerankAvailable
-                    ? "Reordena os melhores resultados usando o classificador opcional."
-                    : "Indisponível nesta sessão porque o backend está sem LLM ativa."}
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={settings.rerank}
-                disabled={!rerankAvailable}
-                onChange={(event) => onUpdate({ rerank: event.target.checked })}
               />
             </label>
           </section>

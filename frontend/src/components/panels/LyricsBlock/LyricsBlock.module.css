@@ -12,6 +12,24 @@
   letter-spacing: -0.005em;
 }
 
+@media (max-width: 640px) {
+  .block,
+  .blockCollapsed {
+    padding: 18px 18px;
+    font-size: 17px;
+  }
+  .toggle {
+    margin: 0 18px 16px;
+  }
+  .num {
+    width: 24px;
+    font-size: 9px;
+  }
+  .line {
+    gap: 12px;
+  }
+}
+
 .blockCollapsed {
   position: relative;
   overflow: hidden;

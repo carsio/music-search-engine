@@ -15,7 +15,6 @@ type Opts<T> = Pick<UseQueryOptions<T>, "enabled" | "staleTime">;
 
 interface SearchOpts extends Opts<SearchResponse> {
   algorithm?: SearchAlgorithm;
-  rerank?: boolean;
   top?: number;
   profile?: SearchProfile;
   bm25K1?: number;
@@ -26,7 +25,6 @@ interface SearchOpts extends Opts<SearchResponse> {
 export function useSearch(query: string, opts: SearchOpts = {}) {
   const {
     algorithm = "bm25",
-    rerank = false,
     top = 10,
     profile = "balanced",
     bm25K1 = 1.5,
@@ -39,14 +37,13 @@ export function useSearch(query: string, opts: SearchOpts = {}) {
     enabled: (enabled ?? true) && query.trim().length > 0,
     staleTime,
     placeholderData: (prev) => prev,
-    queryKey: ["search", query, algorithm, rerank, top, profile, bm25K1, bm25B, tfScheme],
+    queryKey: ["search", query, algorithm, top, profile, bm25K1, bm25B, tfScheme],
     queryFn: async () => {
       const { data } = await api.get<SearchResponse>("/search", {
         params: {
           q: query,
           top,
           algorithm,
-          rerank,
           profile,
           bm25_k1: bm25K1,
           bm25_b: bm25B,

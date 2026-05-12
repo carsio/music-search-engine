@@ -14,6 +14,7 @@
 @media (max-width: 640px) {
   .hero {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 }
 
@@ -27,6 +28,14 @@
   padding: 18px;
   min-height: 240px;
   overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .cover {
+    aspect-ratio: 16 / 9;
+    min-height: 160px;
+    padding: 14px;
+  }
 }
 
 .coverOverlay {
@@ -79,6 +88,19 @@
   line-height: 1;
   margin: 0 0 6px;
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .title {
+    font-size: 32px;
+  }
+}
+
+@media (max-width: 380px) {
+  .title {
+    font-size: 28px;
+  }
 }
 
 .byline {
@@ -149,6 +171,15 @@
   margin: 0;
 }
 
+@media (max-width: 640px) {
+  .sectionTitle {
+    font-size: 22px;
+  }
+  .artistName {
+    font-size: 26px;
+  }
+}
+
 .sectionMeta {
   font-family: var(--mono);
   font-size: 11px;
@@ -172,6 +203,12 @@
   padding: 14px 8px;
   border-bottom: 1px solid var(--line-3);
   cursor: pointer;
+  min-height: 56px;
+}
+
+.trackTitle,
+.trackSub {
+  overflow-wrap: anywhere;
 }
 
 .trackRow:hover {

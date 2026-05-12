@@ -56,12 +56,14 @@
   margin: 0;
   color: #1a3eb8;
   letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
 }
 
 .subtitle {
   font-size: 13px;
   color: var(--ink-3);
   margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 
 .snippet {
@@ -70,4 +72,17 @@
   color: var(--ink-2);
   max-width: 64ch;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .title {
+    font-size: 19px;
+  }
+  .path {
+    max-width: 40ch;
+  }
+  .result {
+    padding: 6px 0;
+  }
 }

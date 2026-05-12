@@ -16,7 +16,6 @@ export function HomeStats() {
       { label: "letras", value: "—" },
       { label: "artistas", value: "—" },
       { label: "álbuns", value: "—" },
-      { label: "llm", value: "—" },
     ];
   } else {
     const ents = data.entities ?? {};
@@ -24,7 +23,6 @@ export function HomeStats() {
       { label: "letras", value: formatNumber(data.tracks_indexed) },
       { label: "artistas", value: formatNumber(ents.artist ?? 0) },
       { label: "álbuns", value: formatNumber(ents.album ?? 0) },
-      { label: "llm", value: data.llm ? "ativa" : "off" },
     ];
   }
 
@@ -39,7 +37,7 @@ export function HomeStats() {
         ))}
       </div>
       <p className={styles.foot}>
-        UFAM · ICC222 · 2026.1 · BM25 + TF-IDF + LLM rerank opcional
+        UFAM · ICC222 · 2026.1 · BM25 + TF-IDF
       </p>
     </div>
   );

@@ -20,7 +20,6 @@ export interface SearchFlowResult {
 export function useSearchFlow(query: string, settings: SearchSettings): SearchFlowResult {
   const search = useSearch(query, {
     algorithm: settings.algorithm,
-    rerank: settings.rerank,
     top: settings.top,
     profile: settings.profile,
     bm25K1: settings.bm25K1,
