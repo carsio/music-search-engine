@@ -1,7 +1,7 @@
 """KeyValueCache: cache SQLite generico para fetchers cascateados.
 
 Mesma forma do `LyricsCache`, mas com schema agnostico (chave + payload JSON).
-Usado por `enrichment/` (Wikipedia) e `llm/` (respostas da LLM).
+Usado por `enrichment/` (Wikipedia).
 
 Nao substitui `LyricsCache` — coexistem. O schema do cache de letras e otimizado
 para inspecao via SQL com colunas dedicadas (`artist`, `title`, `lyrics`); aqui
@@ -43,8 +43,7 @@ class KeyValueCache:
         fetched_at INTEGER NOT NULL,
         trace TEXT                  -- JSON com tentativas (debug)
 
-    A chave deve ser deterministica para a entrada (ex.: sha1 de modelo+prompt+input
-    para LLM, ou `<kind>:<slug>` para enrichment).
+    A chave deve ser deterministica para a entrada (ex.: `<kind>:<slug>` no enrichment).
     """
 
     def __init__(self, path: Path | str, table: str = "kv_cache"):

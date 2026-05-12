@@ -1,8 +1,8 @@
-"""Enrichment de entidades (artistas, albuns, generos, compositores) via web + LLM.
+"""Enrichment de entidades (artistas, albuns, generos, compositores) a partir da Wikipedia PT.
 
 Pipeline em duas etapas:
-1. **Source** (ex.: Wikipedia PT) busca conteudo cru por entidade.
-2. **LLM** extrai um JSON estruturado (schema em `music_search.llm.prompts`).
+1. **Fetch** baixa o conteudo cru da Wikipedia PT por entidade.
+2. **Materialize** extrai o payload estruturado localmente (parsing do texto + heuristicas).
 
 Resultado vai para `data/derived/enrichment_cache.sqlite` (KeyValueCache).
 Depois, ``music_search.scripts.export_entities`` consolida o cache em parquets versionados.

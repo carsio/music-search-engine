@@ -24,7 +24,8 @@ class EnrichmentItem(dict):
 class EnrichmentSource(Protocol):
     """Fonte que retorna conteudo cru para uma entidade.
 
-    O conteudo (texto/HTML) e depois passado para a LLM para extracao estruturada.
+    O conteudo (texto/HTML) e depois passado para o materializador local que
+    extrai um payload estruturado (parsing + heuristicas, sem LLM).
     """
 
     name: str

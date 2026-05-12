@@ -1,7 +1,7 @@
 """Schemas de entidades enriquecidas. Espelham o contrato da UI mockup (`music search/data.jsx`).
 
 Mantemos como `TypedDict` (forma plana, serializavel) e nao como dataclass — a saida
-da LLM e dict, e os parquets gerados por `export_entities.py` tambem.
+do materializador e dict, e os parquets gerados por `export_entities.py` tambem.
 """
 
 from __future__ import annotations

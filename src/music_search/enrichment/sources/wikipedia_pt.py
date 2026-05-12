@@ -2,7 +2,7 @@
 
 Fluxo:
 - `GET /w/api.php?action=query&list=search&srsearch=...&format=json` resolve titulo.
-- `wikipediaapi` baixa resumo/secoes em texto para alimentar a extracao da LLM.
+- `wikipediaapi` baixa resumo/secoes em texto para alimentar o materializador local.
 - Fallback para `GET /api/rest_v1/page/html/{title}` caso o client Python falhe.
 """
 

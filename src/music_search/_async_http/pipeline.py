@@ -2,7 +2,7 @@
 
 Espelha o pipeline de letras (`lyrics/pipeline.py:_process_track`) sem o acoplamento
 ao dominio de musicas (artist/title/variants). Aqui o item e generico — pode ser
-um artista para enriquecer via Wikipedia, um prompt para a LLM, etc.
+um artista para enriquecer via Wikipedia, ou qualquer outra fonte externa.
 
 Para preservar o comportamento existente do pipeline de letras (que tem logica
 especifica de variantes de titulo), `lyrics/pipeline.py` nao foi modificado e

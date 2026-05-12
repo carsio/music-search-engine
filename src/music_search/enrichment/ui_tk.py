@@ -5,7 +5,7 @@ Uso:
 
 Fluxo coberto pela UI:
 1. baixar documentos relacionados
-2. normalizar com LLM
+2. materializar payload local a partir do texto bruto
 3. music_search.scripts.export_entities
 4. music_search.scripts.build_dataset --skip-lyrics
 """
@@ -13,7 +13,6 @@ Fluxo coberto pela UI:
 from __future__ import annotations
 
 import json
-import os
 import queue
 import subprocess
 import sys
@@ -161,7 +160,7 @@ class EnrichmentApp(tk.Tk):
         self._normalize_llm_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             frame,
-            text="2. Normalizar com LLM",
+            text="2. Materializar payload",
             variable=self._normalize_llm_var,
         ).grid(row=0, column=6, sticky="w")
 
@@ -383,8 +382,6 @@ class EnrichmentApp(tk.Tk):
         if not stages:
             messagebox.showwarning("Nada para executar", "Selecione ao menos uma etapa.")
             return
-        if not self._validate_prerequisites(stages):
-            return
 
         (
             self._target_by_kind,
@@ -509,33 +506,6 @@ class EnrichmentApp(tk.Tk):
                 retry_errors = True
             i += 1
         return plural_kind, phase, limit, retry_errors
-
-    def _validate_prerequisites(self, stages: list[_Stage]) -> bool:
-        has_normalization = False
-        for stage in stages:
-            parsed = self._parse_enrichment_stage(stage.argv)
-            if parsed is None:
-                continue
-            _, phase, _, _ = parsed
-            if phase in {"all", "normalize"}:
-                has_normalization = True
-                break
-        if not has_normalization:
-            return True
-
-        nim_base_url = os.environ.get("NIM_BASE_URL", "").strip()
-        if nim_base_url:
-            return True
-
-        msg = (
-            "NIM_BASE_URL nao esta definido no ambiente atual.\n\n"
-            "As etapas de normalizacao dependem de uma API OpenAI-compativel.\n"
-            "Configure NIM_BASE_URL (e opcionalmente NIM_API_KEY) antes de iniciar.\n\n"
-            "Se voce quiser apenas baixar documentos brutos, desmarque a fase 'Normalizar com LLM'."
-        )
-        self._log_line("Prerequisito ausente: NIM_BASE_URL.")
-        messagebox.showerror("Prerequisito ausente", msg)
-        return False
 
     def _stop_run(self) -> None:
         self._stop_flag.set()

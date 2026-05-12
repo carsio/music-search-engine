@@ -46,10 +46,6 @@ from music_search.web.snippets import extract_snippets
 
 logger = logging.getLogger(__name__)
 
-# LLM e opcional. Se NIM_API_KEY nao estiver setado, intent classification e rerank
-# silenciosamente caem para fallback heuristico.
-_NIM_AVAILABLE = bool(os.environ.get("NIM_API_KEY"))
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -63,39 +59,14 @@ async def lifespan(app: FastAPI):
         {k: v.num_docs for k, v in multi.entity_indexes.items()},
     )
 
-    nim_client = None
-    llm_cache = None
-    if _NIM_AVAILABLE:
-        from music_search.llm.cache import LLMCache
-        from music_search.llm.client import NimClient
-
-        nim_client = NimClient()
-        llm_cache = LLMCache()
-        logger.info(
-            "Cliente NIM ativo (modelos: extract=%s, intent=%s, rerank=%s)",
-            nim_client.cfg.model_extract,
-            nim_client.cfg.model_intent,
-            nim_client.cfg.model_rerank,
-        )
-    else:
-        logger.info("NIM_API_KEY ausente — usando fallback heuristico para intent.")
-
     app.state.track_engine = track_engine
     app.state.multi = multi
-    app.state.nim_client = nim_client
-    app.state.llm_cache = llm_cache
-    try:
-        yield
-    finally:
-        if nim_client is not None:
-            await nim_client.aclose()
-        if llm_cache is not None:
-            llm_cache.close()
+    yield
 
 
 app = FastAPI(
     title="Music Search Engine",
-    description="Buscador de musicas brasileiras (BM25/TF-IDF + LLM rerank).",
+    description="Buscador de musicas brasileiras (BM25/TF-IDF).",
     version="0.2.0",
     lifespan=lifespan,
 )
@@ -157,22 +128,6 @@ def heuristic_intent(query: str) -> str:
     if 1 <= len(words) <= 3:
         return "artist"
     return "lyric"
-
-
-async def classify_intent_with_fallback(query: str, app: FastAPI) -> tuple[str, bool]:
-    """Retorna (intent, used_llm)."""
-    if app.state.nim_client is None:
-        return heuristic_intent(query), False
-    try:
-        from music_search.llm.tasks import classify_intent
-
-        intent = await classify_intent(
-            query, client=app.state.nim_client, cache=app.state.llm_cache
-        )
-        return intent, True
-    except Exception as exc:
-        logger.warning("classify_intent fallback: %s", exc)
-        return heuristic_intent(query), False
 
 
 def hit_to_item(hit: dict[str, Any]) -> SearchResultItem:
@@ -240,22 +195,21 @@ def healthz() -> dict[str, Any]:
     multi = getattr(app.state, "multi", None)
     entity_indexes = getattr(multi, "entity_indexes", {}) or {}
     entities = {k: v.num_docs for k, v in entity_indexes.items()}
-    return {"ok": True, "tracks_indexed": tracks, "entities": entities, "llm": _NIM_AVAILABLE}
+    return {"ok": True, "tracks_indexed": tracks, "entities": entities}
 
 
 @app.get("/api/search", response_model=SearchResponse)
-async def search(
+def search(
     q: Annotated[str, Query(min_length=1, max_length=200)],
     top: Annotated[int, Query(ge=1, le=50)] = 10,
     algorithm: Annotated[str, Query(pattern="^(bm25|tfidf)$")] = "bm25",
-    rerank: bool = False,
     profile: Annotated[SearchProfile, Query()] = "balanced",
     bm25_k1: Annotated[float, Query(gt=0.0, le=3.0)] = 1.5,
     bm25_b: Annotated[float, Query(ge=0.0, le=1.0)] = 0.75,
     tf_scheme: Annotated[TfScheme, Query()] = "log",
 ) -> SearchResponse:
     started = time.time()
-    intent, _used_llm = await classify_intent_with_fallback(q, app)
+    intent = heuristic_intent(q)
 
     multi: MultiEntityIndex = app.state.multi
     routed = multi.search_routed(
@@ -278,35 +232,6 @@ async def search(
             h = {**h, "kind": "track"}
         hits.append(hit_to_item(h))
 
-    rerank_used = False
-    if rerank and app.state.nim_client is not None and hits:
-        try:
-            from music_search.llm.tasks import rerank as llm_rerank
-
-            payload_for_rerank = [
-                {
-                    "id": h.id,
-                    "title": h.title,
-                    "artist": h.subtitle or "",
-                    "snippet": h.snippet or "",
-                }
-                for h in hits
-            ]
-            ordered = await llm_rerank(
-                q,
-                payload_for_rerank,
-                top,
-                client=app.state.nim_client,
-                cache=app.state.llm_cache,
-            )
-            order = {item["id"]: i for i, item in enumerate(ordered)}
-            hits = sorted(hits, key=lambda h: order.get(h.id, 1_000))
-            for new_rank, h in enumerate(hits, start=1):
-                h.rank = new_rank
-            rerank_used = True
-        except Exception as exc:
-            logger.warning("rerank fallback: %s", exc)
-
     elapsed = int((time.time() - started) * 1000)
     return SearchResponse(
         query=q,
@@ -314,7 +239,7 @@ async def search(
         intent_used=cast(Intent, intent_used),
         algorithm=cast(SearchAlgorithm, algorithm),
         items=hits,
-        rerank_used=rerank_used,
+        rerank_used=False,
         elapsed_ms=elapsed,
     )
 

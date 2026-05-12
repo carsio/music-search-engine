@@ -59,5 +59,5 @@ src/
 - `ArtistPanel`: knowledge panel (bio, gêneros, top tracks, discografia)
 - `SongPanel`: letra completa com destaque dos termos da query
 
-`/search` retorna o intent classificado pela API (LLM se `NIM_API_KEY`
-estiver setado, ou heurística como fallback) e roteia o card principal.
+`/search` retorna o intent classificado pela API por heurística
+determinística e roteia o card principal.

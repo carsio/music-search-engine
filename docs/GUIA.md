@@ -19,7 +19,7 @@ aqui e leia em ordem.
 3. [Pipeline de dados (offline)](#3-pipeline-de-dados-offline)
 4. [Core de RI: pré-processamento, índice e ranking](#4-core-de-ri-pré-processamento-índice-e-ranking)
 5. [Motores: como o core vira busca real](#5-motores-como-o-core-vira-busca-real)
-6. [Intent classification e LLM (opcional)](#6-intent-classification-e-llm-opcional)
+6. [Intent classification (heurística)](#6-intent-classification-heurística)
 7. [Snippets de letras](#7-snippets-de-letras)
 8. [Apresentação: API, frontend e UIs Tk](#8-apresentação-api-frontend-e-uis-tk)
 9. [Trajeto ponta a ponta de uma query](#9-trajeto-ponta-a-ponta-de-uma-query)
@@ -56,7 +56,6 @@ forte em um regime:
 | **TF-IDF** (cosseno) | termos exatos da query aparecem nos documentos | sinônimos, paráfrases |
 | **BM25** Okapi | igual ao TF-IDF, mas com saturação de tf e normalização por tamanho — padrão da indústria | sinônimos, paráfrases |
 | **Busca vetorial** (embeddings + Milvus) | semântica: "rock pesado anos 70" acha matches sem termos exatos | termos raros, nomes próprios |
-| **LLM** (rerank/intent) | refinar top-k semanticamente, classificar a intenção da query | latência, custo, depende de chave |
 
 A ideia é que **cada técnica complementa as outras**, e a apresentação final
 roteia a consulta para o motor mais adequado.
@@ -95,7 +94,6 @@ O código é organizado em quatro camadas físicas, todas em `src/music_search/`
 │  scripts/         (build_curated_corpus, export_entities, ...)  │
 │  lyrics/          (cascata de fontes para baixar letras)        │
 │  enrichment/      (Wikipedia PT → payload local)                │
-│  llm/             (cliente NIM opcional p/ intent e rerank)     │
 │  _async_http/     (cache SQLite + throttle + circuit breaker)   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -161,7 +159,7 @@ A infra anti-bloqueio mora em `_async_http/`:
 - **`CircuitBreaker`** — depois de N falhas consecutivas, "abre" e nega
   chamadas por um cooldown, evitando martelar uma fonte que caiu.
 - **`KeyValueCache`** — cache SQLite genérico com `(key, status, payload,
-  trace, error)`, reusado também pelo enrichment e pelo LLM.
+  trace, error)`, reusado também pelo enrichment.
 - **`random_browser_headers`** — pool de User-Agents reais para fontes
   que filtram bots.
 
@@ -184,8 +182,7 @@ está em `enrichment/`:
    `_async_http/`.
 3. **Materialização** (`enrichment/pipeline.py`): transforma o texto bruto
    em payload determinístico (nome, descrição/bio curta, gêneros
-   relacionados, `raw_text` completo). Sem LLM por padrão; opcionalmente
-   o LLM pode estruturar campos quando `NIM_API_KEY` está configurado.
+   relacionados, `raw_text` completo) usando parsing local e heurísticas.
 4. **Export**
    (`python -m music_search.scripts.export_entities`):
    consolida o cache em `br_artists.parquet`, `br_genres.parquet`,
@@ -401,15 +398,12 @@ Tk próprias.
 
 ---
 
-## 6. Intent classification e LLM (opcional)
+## 6. Intent classification (heurística)
 
 A query `"saudade do meu amor"` tem cara de letra. `"ana carolina"` tem
-cara de artista. Saber isso muda o motor que vai responder. A
-classificação de intent acontece em duas etapas:
+cara de artista. Saber isso muda o motor que vai responder.
 
-### 6.1. Heurística (sempre disponível)
-
-Em `web/app.py` há um classificador determinístico simples:
+Em `web/app.py` há um classificador heurístico determinístico:
 
 - contém `"album "`, `"banda "`, ou termos típicos → `album`;
 - contém `"letra "`, frases longas com pronomes → `lyric`;
@@ -417,34 +411,10 @@ Em `web/app.py` há um classificador determinístico simples:
 - contém `"samba"`, `"bossa"`, gêneros conhecidos → `genre`;
 - caso geral → fallback `lyric`.
 
-Funciona razoável e nunca falha por chave/rede.
-
-### 6.2. LLM (quando `NIM_API_KEY` está setada)
-
-`llm/tasks.py` define `classify_intent(query) -> Intent`, que chama um
-LLM (NIM API, OpenAI-compatível) com um system prompt que pede para
-classificar entre `artist | album | song | lyric | genre | none`. O
-resultado é memoizado em `LLMCache` (SQLite, chave =
-`sha1(prompt + input)`), então a segunda vez é instantânea.
-
-Se a chamada falha (sem chave, sem rede, timeout), cai silenciosamente
-no classificador heurístico. **Nunca há dependência dura no LLM.**
-
-### 6.3. Rerank LLM (opcional, ?rerank=true)
-
-Depois que o motor esparso retorna top-K (digamos, 20), o cliente pode
-pedir `?rerank=true`. Aí `llm/tasks.py rerank()` envia query + os 20
-candidatos para o LLM com prompt que pede ranking semântico, e
-devolve a nova ordem. Lento (~1s) e caro (custo de tokens), por isso
-opt-in.
-
-### 6.4. Materialização de entidades
-
-Há um terceiro uso do LLM: durante o enrichment, opcionalmente, para
-transformar texto bruto da Wikipedia em JSON estruturado
-(`extract_artist_json`). É offline, então latência não importa. O
-enrichment determinístico cobre o caso sem LLM, então o LLM aqui é só
-melhoria.
+A escolha por uma heurística (e não por LLM) é deliberada: o classificador
+é instantâneo, não depende de chave, não tem cold start e o critério é
+auditável em código. O resultado alimenta `multi_index.search_routed` para
+escolher entre o índice esparso de tracks e os índices de entidades.
 
 ---
 
@@ -523,8 +493,8 @@ Vamos seguir `"saudade do meu amor"` desde o navegador:
    `GET /api/search?q=saudade+do+meu+amor&top=10`.
 2. **FastAPI** (`web/app.py`) recebe a chamada, monta um
    `SearchRequest`.
-3. **Intent classification**: tenta LLM se `NIM_API_KEY` setada (cache
-   SQLite hit → instantâneo); senão, heurística → `intent="lyric"`.
+3. **Intent classification**: `heuristic_intent(query)` retorna
+   `intent="lyric"` instantaneamente.
 4. **Routing**: `multi.search_routed(query, intent="lyric", top_k=10)`
    chama `SparseSearchEngine.search(query)` restrito ao campo `lyrics`.
 5. **Pré-processamento**: `preprocess("saudade do meu amor")` →
@@ -543,7 +513,7 @@ Vamos seguir `"saudade do meu amor"` desde o navegador:
     `<mark>`.
 
 Tempo total típico (com cache quente): ~30 ms para a busca, +alguns ms
-de serialização. Se `?rerank=true`, mais ~800 ms de chamada LLM.
+de serialização.
 
 ---
 
@@ -605,8 +575,6 @@ uv run --extra vector --extra lyrics ty check
 - **Milvus** — banco vetorial usado para a busca semântica.
 - **Intent** — classificação da pergunta do usuário (artist, album, song,
   lyric, genre, none).
-- **Rerank** — reordenar o top-K do motor esparso usando um modelo mais
-  caro (LLM) por relevância semântica.
 - **Snippet** — recorte de letra que contém os termos da query, exibido
   com destaque visual no frontend.
 - **Cascade fetch** — tentar várias fontes em ordem até uma responder

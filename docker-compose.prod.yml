@@ -4,15 +4,6 @@ services:
     pull_policy: always
     ports:
       - "80:8000"
-    environment:
-      NIM_API_KEY: ${NIM_API_KEY:-}
-      NIM_BASE_URL: ${NIM_BASE_URL:-}
-      NIM_MODEL_EXTRACT: ${NIM_MODEL_EXTRACT:-}
-      NIM_MODEL_INTENT: ${NIM_MODEL_INTENT:-}
-      NIM_MODEL_RERANK: ${NIM_MODEL_RERANK:-}
-      NIM_TIMEOUT: ${NIM_TIMEOUT:-60}
-      NIM_RATE: ${NIM_RATE:-1.0}
-      NIM_MAX_RETRIES: ${NIM_MAX_RETRIES:-4}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz').read()"]
       interval: 30s

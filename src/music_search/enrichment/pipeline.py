@@ -400,9 +400,6 @@ async def run_enrichment(
     kind: EntityKind,
     seeds: Iterable[str],
     cfg: EnrichmentConfig,
-    *,
-    llm_client: Any | None = None,
-    llm_cache: Any | None = None,
 ) -> dict[str, int]:
     """Roda enrichment por fase para uma entidade usando o cache como handoff."""
     cache = KeyValueCache(cfg.cache_path, table=cfg.cache_table)

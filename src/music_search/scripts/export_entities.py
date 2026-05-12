@@ -95,7 +95,7 @@ def export_kind(
 def _normalize_record(record: dict, kind: str) -> dict:
     """Garante que campos esperados existem, mesmo que vazios.
 
-    Permite que o parquet tenha schema estavel quando a LLM omite campos.
+    Permite que o parquet tenha schema estavel quando o materializador omite campos.
     DuckDB infere o schema do primeiro registro entao mantemos a forma.
     """
     base = {

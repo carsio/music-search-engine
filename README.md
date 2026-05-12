@@ -7,15 +7,15 @@ Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFA
 📊 Slides: <https://carsio.github.io/music-search-engine/>
 
 > 📖 Para entender o sistema do começo ao fim — conceitos de RI, pipeline de
-> dados, BM25/TF-IDF (com fórmulas), motores, intent, LLM e o trajeto de uma
-> query — comece por **[`docs/GUIA.md`](docs/GUIA.md)**. Este README é
-> referência rápida de comandos.
+> dados, BM25/TF-IDF (com fórmulas), motores, classificação de intent e o
+> trajeto de uma query — comece por **[`docs/GUIA.md`](docs/GUIA.md)**. Este
+> README é referência rápida de comandos.
 
 ## Visão geral
 
 O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, BM25) e a busca vetorial densa (embeddings + Milvus), e expõe esse motor através de uma API FastAPI consumida por um frontend React. Os dados foram curados a partir do Spotify Metadata e enriquecidos com letras (lyrics.ovh, Vagalume, letras.mus.br, Genius) e conteúdo da Wikipedia PT materializado de forma determinística para as entidades.
 
-O fluxo principal hoje é: a API em `music_search.web.app` recebe a query, classifica a intent via heurística ou LLM opcional, delega o roteamento para `multi_index.MultiEntityIndex`, consulta o índice esparso ou a dimensão apropriada e devolve a resposta para a SPA em `frontend/`.
+O fluxo principal hoje é: a API em `music_search.web.app` recebe a query, classifica a intent via heurística determinística, delega o roteamento para `multi_index.MultiEntityIndex`, consulta o índice esparso ou a dimensão apropriada e devolve a resposta para a SPA em `frontend/`.
 
 Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.json`, versão `0.3.0`, gerado em `2026-05-08`):
 
@@ -69,7 +69,6 @@ Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.js
 │                                                                 │
 │  Componentes auxiliares:                                        │
 │  _async_http/  — http async com cache+throttle+circuit breaker  │
-│  llm/          — cliente NIM opcional (intent / rerank)         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -92,14 +91,7 @@ Os datasets finais em `data/derived/final/` vão versionados no repo, então **n
 
 ### Variáveis de ambiente
 
-Use `.env.example` como template local. O projeto lê variáveis do ambiente; se você usar um arquivo `.env`, carregue-o no terminal/VSCode antes de executar os comandos. O projeto não define endpoint de LLM por padrão; configure explicitamente uma API OpenAI-compatível apenas quando for rodar classificação por LLM ou rerank.
-
-```powershell
-$env:NIM_API_KEY="sua-chave"
-$env:NIM_BASE_URL="https://seu-endpoint-openai-compativel/v1"
-$env:NIM_RATE="1.0"          # reduza para 0.5 se receber muitos 429
-$env:NIM_MAX_RETRIES="4"     # retries automaticos no cliente NIM
-```
+O motor de busca não exige nenhuma variável de ambiente para rodar. Use `.env.example` como template local apenas para fontes opcionais (Vagalume/Genius tokens para o pipeline de letras, embeddings vetoriais). Se você usar um arquivo `.env`, carregue-o no terminal/VSCode antes de executar os comandos.
 
 ## Modos de uso
 
@@ -243,7 +235,7 @@ Variáveis opcionais: `VAGALUME_API_KEY`, `GENIUS_TOKEN`. Sem elas, ainda funcio
 
 ### Enriquecimento (Wikipedia → entidades)
 
-O enrichment offline nao requer LLM. O fluxo usa apenas seeds do corpus curado, coleta texto da Wikipedia PT e materializa um payload minimo e deterministico por entidade. O fluxo e:
+O enrichment offline é totalmente determinístico. O fluxo usa apenas seeds do corpus curado, coleta texto da Wikipedia PT e materializa um payload mínimo por entidade. O fluxo é:
 
 ```text
 br_curated_tracks.parquet
@@ -323,7 +315,6 @@ painel de artefatos gerados (`br_*.parquet` e `br_dataset_manifest.json`).
 - `vector/`: indexação de embeddings, busca vetorial e UI Tk dedicada.
 - `lyrics/`: coleta de letras, estatísticas e consolidação do corpus.
 - `enrichment/`: seeds, coleta da Wikipedia PT, materialização local e UI Tk do pipeline.
-- `llm/`: cliente NIM e tarefas opcionais de intent/rerank.
 - `_async_http/`: cache SQLite, throttle, retries e circuit breaker compartilhados.
 - `ui_tk.py`: interface desktop para comparar BM25 x TF-IDF.
 
@@ -388,12 +379,12 @@ painel de artefatos gerados (`br_*.parquet` e `br_dataset_manifest.json`).
 
 - **Álbuns e compositores enriquecidos**: `br_albums.parquet` e `br_composers.parquet` ainda não entram no snapshot versionado atual.
 - **Cobertura do `MultiEntityIndex`**: artist e genre já carregam do manifesto atual, mas album/composer ainda dependem dos exports restantes.
-- **Avaliação de qualidade**: rerank por LLM e os perfis de busca ainda precisam de medição comparativa controlada.
+- **Avaliação de qualidade**: os perfis de busca ainda precisam de medição comparativa controlada.
 
 ### ❌ Falta
 
 - **`evaluation.py`** está vazio (só docstring). Precisa implementar Precision, Recall, MAP e nDCG e construir um conjunto de queries com julgamento (golden set) para comparar BM25 × TF-IDF × vetorial.
-- **Benchmarking consolidado**: falta fechar uma comparação reproduzível entre sparse, vetorial e rerank.
+- **Benchmarking consolidado**: falta fechar uma comparação reproduzível entre sparse e vetorial.
 
 ## Equipe
 

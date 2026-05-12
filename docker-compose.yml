@@ -5,11 +5,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    environment:
-      NIM_API_KEY: ${NIM_API_KEY:-}
-      NIM_BASE_URL: ${NIM_BASE_URL:-}
-      NIM_RATE: ${NIM_RATE:-1.0}
-      NIM_MAX_RETRIES: ${NIM_MAX_RETRIES:-4}
     volumes:
       - search-indexes:/app/data/indexes
     healthcheck:

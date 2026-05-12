@@ -1,8 +1,8 @@
 """Infraestrutura assincrona compartilhada: rate limit, circuit breaker, cache KV, cascade.
 
 Originalmente vivia em `music_search.lyrics.*` e foi promovida aqui para reuso
-pelos pipelines de enrichment (Wikipedia) e LLM. O codigo de letras continua
-funcionando via re-export — ver `lyrics/throttle.py` e `lyrics/user_agents.py`.
+pelo pipeline de enrichment (Wikipedia). O codigo de letras continua funcionando
+via re-export — ver `lyrics/throttle.py` e `lyrics/user_agents.py`.
 """
 
 from music_search._async_http.cache import KeyValueCache

@@ -145,8 +145,7 @@ def test_get_artist_aceita_payload_minimo_wikipedia_only() -> None:
     assert response.source_url == "https://pt.wikipedia.org/wiki/Gilberto_Gil"
 
 
-@pytest.mark.anyio
-async def test_search_encaminha_parametros_avancados_ao_multi_index() -> None:
+def test_search_encaminha_parametros_avancados_ao_multi_index() -> None:
     class _MultiStub:
         def __init__(self) -> None:
             self.kwargs = {}
@@ -169,14 +168,11 @@ async def test_search_encaminha_parametros_avancados_ao_multi_index() -> None:
             }
 
     app.state.multi = _MultiStub()
-    app.state.nim_client = None
-    app.state.llm_cache = None
 
-    response = await search(
+    response = search(
         q="neblina",
         top=7,
         algorithm="tfidf",
-        rerank=False,
         profile="metadata",
         bm25_k1=2.2,
         bm25_b=0.4,
