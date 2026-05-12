@@ -29,6 +29,11 @@ RUN pip install --upgrade pip \
     && pip install ".[lyrics]" \
     && python -m nltk.downloader -d "$NLTK_DATA" punkt_tab stopwords rslp
 
+# Pre-computa o índice esparso no build para evitar 5–10 min de CPU
+# no primeiro boot do container. O .pkl resultante é serializado em
+# data/indexes/ e reaproveitado em runtime via load_or_build_default_engine.
+RUN python -c "from music_search.motors.search import load_or_build_default_engine; load_or_build_default_engine()"
+
 EXPOSE 8000
 
 CMD ["uvicorn", "music_search.web.app:app", "--host", "0.0.0.0", "--port", "8000"]
