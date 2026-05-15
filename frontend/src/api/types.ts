@@ -1,5 +1,5 @@
 export type Intent = "artist" | "album" | "song" | "track" | "lyric" | "genre" | "none";
-export type SearchAlgorithm = "bm25" | "tfidf";
+export type SearchAlgorithm = "bm25" | "tfidf" | "dense";
 
 export interface SearchResultItem {
   id: string;

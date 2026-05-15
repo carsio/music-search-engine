@@ -12,6 +12,30 @@ from music_search.motors.multi_index import MultiEntityIndex
 from music_search.motors.search import load_or_build_default_engine
 
 
+def _build_dense(track_engine: object) -> None:
+    """Constrói e persiste o índice FAISS. Ignora se deps não instaladas."""
+    try:
+        from music_search.motors.dense_search import (
+            DEFAULT_DENSE_INDEX_PATH,
+            DEFAULT_DENSE_META_PATH,
+            DenseSearchEngine,
+        )
+    except ImportError:
+        print("[prepare_search_artifacts] sentence-transformers/faiss não instalados — pulando índice denso")
+        return
+
+    records = list(getattr(track_engine, "documents", {}).values())
+    if not records:
+        print("[prepare_search_artifacts] nenhum documento para indexar no motor denso")
+        return
+
+    t0 = time.perf_counter()
+    print(f"[prepare_search_artifacts] construindo índice denso ({len(records)} docs)...")
+    engine = DenseSearchEngine.build(records)
+    engine.save(DEFAULT_DENSE_INDEX_PATH, DEFAULT_DENSE_META_PATH)
+    print(f"[prepare_search_artifacts] índice denso: {engine.num_docs} docs ({time.perf_counter() - t0:.1f}s)")
+
+
 def main() -> None:
     start = time.perf_counter()
 
@@ -30,7 +54,10 @@ def main() -> None:
         f"[prepare_search_artifacts] entities: {entity_counts} "
         f"({after_entities - after_tracks:.1f}s)"
     )
-    print(f"[prepare_search_artifacts] pronto em {after_entities - start:.1f}s")
+
+    _build_dense(track_engine)
+
+    print(f"[prepare_search_artifacts] pronto em {time.perf_counter() - start:.1f}s")
 
 
 if __name__ == "__main__":

@@ -74,8 +74,31 @@ async def lifespan(app: FastAPI):
         logger.warning("Warmup falhou (segue mesmo assim): %s", exc)
     logger.info("Warmup concluído em %.1fs", time.time() - warmup_started)
 
+    # Motor de busca densa (opcional — requer sentence-transformers + faiss)
+    try:
+        from music_search.motors.dense_search import (
+            DEFAULT_DENSE_INDEX_PATH,
+            DEFAULT_DENSE_META_PATH,
+            DenseSearchEngine,
+        )
+
+        if DEFAULT_DENSE_INDEX_PATH.exists() and DEFAULT_DENSE_META_PATH.exists():
+            dense_engine: DenseSearchEngine | None = DenseSearchEngine.load(
+                DEFAULT_DENSE_INDEX_PATH, DEFAULT_DENSE_META_PATH
+            )
+            assert dense_engine is not None
+            dense_engine.warmup()
+            logger.info("Motor denso carregado: %d docs", dense_engine.num_docs)
+        else:
+            logger.info("Índice denso não encontrado — /api/search/dense indisponível")
+            dense_engine = None
+    except ImportError:
+        logger.info("sentence-transformers/faiss não instalados — /api/search/dense indisponível")
+        dense_engine = None
+
     app.state.track_engine = track_engine
     app.state.multi = multi
+    app.state.dense_engine = dense_engine
     logger.info("Lifespan startup total: %.1fs", time.time() - started)
     yield
 
@@ -257,6 +280,28 @@ def search(
         items=hits,
         rerank_used=False,
         elapsed_ms=elapsed,
+    )
+
+
+@app.get("/api/search/dense", response_model=SearchResponse)
+def search_dense(
+    q: Annotated[str, Query(min_length=1, max_length=200)],
+    top: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> SearchResponse:
+    dense_engine = getattr(app.state, "dense_engine", None)
+    if dense_engine is None:
+        raise HTTPException(503, "motor de busca vetorial não disponível")
+    started = time.time()
+    raw_hits = dense_engine.search(q, top_k=top)
+    items = [hit_to_item({**h.to_dict(), "kind": "track"}) for h in raw_hits]
+    return SearchResponse(
+        query=q,
+        intent_requested=cast(Intent, "track"),
+        intent_used=cast(Intent, "track"),
+        algorithm=cast(SearchAlgorithm, "dense"),
+        items=items,
+        rerank_used=False,
+        elapsed_ms=int((time.time() - started) * 1000),
     )
 
 

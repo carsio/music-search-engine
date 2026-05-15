@@ -39,6 +39,12 @@ export function useSearch(query: string, opts: SearchOpts = {}) {
     placeholderData: (prev) => prev,
     queryKey: ["search", query, algorithm, top, profile, bm25K1, bm25B, tfScheme],
     queryFn: async () => {
+      if (algorithm === "dense") {
+        const { data } = await api.get<SearchResponse>("/search/dense", {
+          params: { q: query, top },
+        });
+        return data;
+      }
       const { data } = await api.get<SearchResponse>("/search", {
         params: {
           q: query,
