@@ -1,0 +1,68 @@
+RELATÓRIO DE AVALIAÇÃO — BUSCADOR DE MÚSICAS BRASILEIRAS
+========================================================================
+Data        : 2026-06-16 22:59
+Coleção     : 50 queries | 1.604 julgamentos | 3 sistemas
+Corpus      : 36.017 faixas (br_curated_lyrics.parquet)
+
+TABELA 1 — RESULTADOS AGREGADOS
+------------------------------------------------------------------------
+  Sistema              MRR       MAP   nDCG@10      P@10     Bpref
+------------------------------------------------------------------------
+  BM25             0.6091*   0.3603*   0.4767*   0.3020*   0.3374*
+  TF-IDF           0.5660    0.3244    0.4293    0.2980    0.2764 
+  Dense            0.2383    0.0652    0.1327    0.0940    0.1134 
+  (* = melhor valor na coluna)
+
+TABELA 2 — nDCG@10 POR INTENT
+------------------------------------------------------------------------
+  Intent              BM25        TF-IDF         Dense
+------------------------------------------------------------------------
+  album             0.2626        0.2267        0.1416  <- BM25
+  artist            0.2327        0.2304        0.1985  <- BM25
+  genre             0.9699        0.9206        0.0603  <- BM25
+  lyric             0.6348        0.5064        0.0936  <- BM25
+  track             0.3019        0.3133        0.1646  <- TF-IDF
+
+TABELA 3 — SIGNIFICÂNCIA ESTATÍSTICA (Wilcoxon signed-rank)
+------------------------------------------------------------------------
+  alpha nominal   = 0.05
+  alpha Bonferroni = 0.05 / 15 testes = 0.00333
+  Sig. em alpha=0.05  :  11 de 15 comparações
+  Sig. após Bonferroni:  10 de 15 comparações
+
+  Par                            Métrica      Med S1   Med S2   p-valor  S05  SBon
+------------------------------------------------------------------------
+  BM25 vs TF-IDF                 nDCG@10      0.4767   0.4293   0.01106   †       
+  BM25 vs TF-IDF                 MAP          0.3603   0.3244   0.15837           
+  BM25 vs TF-IDF                 MRR          0.6091   0.5660   0.36568           
+  BM25 vs TF-IDF                 P@10         0.3020   0.2980   0.75164           
+  BM25 vs TF-IDF                 Bpref        0.3374   0.2764   0.10746           
+  BM25 vs Dense                  nDCG@10      0.4767   0.1327       0.0   †    ‡  
+  BM25 vs Dense                  MAP          0.3603   0.0652       0.0   †    ‡  
+  BM25 vs Dense                  MRR          0.6091   0.2383     3e-05   †    ‡  
+  BM25 vs Dense                  P@10         0.3020   0.0940     1e-05   †    ‡  
+  BM25 vs Dense                  Bpref        0.3374   0.1134     6e-05   †    ‡  
+  TF-IDF vs Dense                nDCG@10      0.4293   0.1327       0.0   †    ‡  
+  TF-IDF vs Dense                MAP          0.3244   0.0652       0.0   †    ‡  
+  TF-IDF vs Dense                MRR          0.5660   0.2383     3e-05   †    ‡  
+  TF-IDF vs Dense                P@10         0.2980   0.0940     2e-05   †    ‡  
+  TF-IDF vs Dense                Bpref        0.2764   0.1134   0.00053   †    ‡  
+  (†: p<0.05  |  ‡: p<alpha Bonferroni)
+
+ARQUIVOS GERADOS
+------------------------------------------------------------------------
+  resultados/analise_qualitativa.txt
+  resultados/por_query\bm25_lyric_por_query.csv
+  resultados/por_query\bm25_por_query.csv
+  resultados/por_query\dense_por_query.csv
+  resultados/por_query\tf_idf_por_query.csv
+  resultados/scores_por_query_pivot.csv
+  resultados/significancia.csv
+  resultados/tabela_intent_ndcg_pivot.csv
+  resultados/tabela_por_intent.csv
+  resultados/tabela_principal.csv
+  figuras/f1_barras_ndcg_intent.png
+  figuras/f2_boxplot_ndcg.png
+  figuras/f3_scatter_bm25_vs_dense.png
+  figuras/f3_scatter_bm25_vs_lyric.png
+  figuras/f4_heatmap_resultados.png

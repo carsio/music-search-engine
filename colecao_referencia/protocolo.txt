@@ -1,0 +1,47 @@
+PROTOCOLO DE RELEVÂNCIA — COLEÇÃO DE REFERÊNCIA
+================================================
+Projeto: Buscador de Músicas Brasileiras (ICC222 / UFAM 2026/1)
+Data: 2026-06-14
+
+ESCALA DE RELEVÂNCIA
+--------------------
+  Grau 2 — Altamente relevante
+    O documento é exatamente o que a consulta busca.
+    Critérios por intent:
+      lyric : documento com a ID exata da música fonte do trecho de letra
+      track : documento com ID ou nome/artista exatos da faixa buscada
+      artist: documento cujo primary_artist_name corresponde ao artista da query
+      genre : documento cujo macro_genre corresponde ao gênero da query
+      album : documento cujo album_name corresponde ao álbum da query
+
+  Grau 1 — Parcialmente relevante
+    Documento relacionado mas não exato.
+    Critérios por intent:
+      lyric : outra música do mesmo artista da fonte do trecho
+      track : outra música do mesmo artista da faixa buscada
+      artist: música de artista do mesmo macro_genre do artista buscado
+      genre : música cujo artist_genres contém termo relacionado ao gênero
+      album : outra música do mesmo artista do álbum buscado
+
+  Grau 0 — Não relevante
+    Documento sem relação com a necessidade informacional.
+
+NOTA SOBRE JULGAMENTOS AUTOMÁTICOS
+------------------------------------
+Esta coleção usa julgamentos automáticos baseados em correspondência de
+metadados (known-item + metadata matching), constituindo um "silver standard".
+Para uso em avaliação final recomenda-se revisão manual dos casos de grau 1,
+especialmente para consultas de gênero, onde a correspondência de macro_genre
+pode ser imprecisa.
+
+POOL
+----
+  Sistemas: BM25, TF-IDF, Busca Lírica (BM25 com perfil lyrics)
+  Profundidade: top-20 por sistema
+  Documentos unjudged (fora do pool): tratados como não recuperados no MAP.
+  Use Bpref como métrica complementar para mitigar este efeito.
+
+CONVERSÃO PARA BINÁRIO (MRR, MAP, P@10, Bpref)
+-------------------------------------------------
+  Relevante  = grau >= 1
+  Não relevante = grau 0
