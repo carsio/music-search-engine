@@ -67,7 +67,7 @@ QUALITATIVE: list[str] = [
 ]
 
 REPEATS = 5  # repetições por consulta para estabilizar a latência
-WARMUP = 3   # consultas de aquecimento (descartadas)
+WARMUP = 3  # consultas de aquecimento (descartadas)
 
 
 def _fmt_ms(seconds: float) -> str:
@@ -87,9 +87,7 @@ def measure_index_build(corpus_path: Path) -> tuple[float, int, int]:
 
 
 def vocab_stats(engine: SparseSearchEngine) -> dict[str, int]:
-    return {
-        field: len(list(engine.index.vocabulary(field))) for field in engine.index.fields
-    }
+    return {field: len(list(engine.index.vocabulary(field))) for field in engine.index.fields}
 
 
 def measure_latency(engine: SparseSearchEngine) -> dict[str, dict[str, float]]:
