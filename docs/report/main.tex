@@ -17,6 +17,21 @@
 \usepackage{microtype}
 \setlength{\emergencystretch}{3em}
 
+% Empacotamento de floats: reduz espaço em branco deixado por tabelas/figuras
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.9}
+\renewcommand{\textfraction}{0.06}
+\renewcommand{\floatpagefraction}{0.72}
+\setlength{\textfloatsep}{12pt plus 2pt minus 2pt}
+
+% Bibliografia compacta (remove o espaçamento duplo entre as referências)
+\let\OLDthebibliography\thebibliography
+\renewcommand\thebibliography[1]{%
+  \OLDthebibliography{#1}%
+  \setlength{\parskip}{0pt}%
+  \setlength{\itemsep}{1pt plus 0.3ex}%
+}
+
 \lstset{
   basicstyle=\ttfamily\small,
   breaklines=true,
@@ -150,7 +165,7 @@ em que o IDF é suavizado para evitar valores negativos:
 \end{equation}
 
 \paragraph{TF-IDF com similaridade de cosseno.} Configurado utilizando o esquema
-de ponderação \textit{ltc} do sistema SMART~\cite{salton1975vector}. O peso do
+de ponderação \textit{ltc} do sistema SMART. O peso do
 termo no documento é determinado por $1 + \ln(\text{tf})$, aplicado tanto para a
 representação bruta quanto para a versão com frequência aumentada. A ordenação
 final dos documentos é obtida pelo cálculo do cosseno do ângulo entre os vetores
@@ -292,32 +307,18 @@ A arquitetura disponibiliza serviços de busca através de uma interface HTTP RE
 \label{sec:colecao}
 % =====================================================================
 
-Alinhado às exigências de rigor metodológico aplicáveis a trabalhos desta
-natureza, o sistema foi validado por meio de um ambiente de testes controlado.
-
 \subsection{Construção da Coleção de Referência}
 
-Para conduzir a avaliação qualitativa, estabeleceu-se uma coleção de referência
-composta por um conjunto representativo de consultas de teste (\textit{queries}).
-Para cada consulta, foi determinado um mapeamento de relevância, definindo quais
-documentos do \textit{dataset} eram estritamente relevantes, parcialmente
-relevantes ou irrelevantes. Uma coleção de teste padrão (estilo
-TREC~\cite{voorhees2005trec}) é composta por três artefatos: (i)~corpus de
-documentos; (ii)~conjunto de consultas; e (iii)~julgamentos de relevância.
-Considerando a existência do nosso corpus de documentos
+Para a avaliação quantitativa dos três métodos implementados --- BM25, TF-IDF e
+busca vetorial densa --- construiu-se uma coleção de referência no estilo TREC,
+composta por três artefatos: (i)~corpus de documentos; (ii)~conjunto de
+consultas; e (iii)~julgamentos de relevância. Sobre o corpus existente
 (\texttt{br\_curated\_lyrics.parquet}, $\approx$36~mil \textit{tracks}),
-construiu-se o conjunto de consultas e o julgamento de relevância dos documentos
-esperados.
-
-\subsection{Coleção de Referência para Avaliação dos Métodos de Busca}
-
-Para a avaliação quantitativa dos três métodos de busca implementados na
-aplicação --- BM25, TF-IDF e busca vetorial densa --- foi construída uma coleção
-de referência seguindo a metodologia TREC~\cite{voorhees2005trec}. A coleção é
-composta por 50 consultas distribuídas em cinco categorias de intenção de busca,
-1.604 julgamentos de relevância graduados em escala de 0 a 2 e três arquivos de
-resultados (\textit{run files}) no formato padrão TREC, possibilitando o cômputo
-das métricas MRR, Bpref@10, DCG@10, nDCG@10, MAP e P@10.
+elaboraram-se 50 consultas distribuídas em cinco categorias de intenção de
+busca, 1.604 julgamentos de relevância graduados em escala de 0 a 2 e três
+arquivos de resultados (\textit{run files}) no formato padrão TREC,
+possibilitando o cômputo das métricas MRR, Bpref@10, DCG@10, nDCG@10, MAP e
+P@10.
 
 \subsubsection{Corpus}
 
@@ -427,7 +428,7 @@ grau $\geq 1$ como relevante.
 (1)~\textbf{BM25}, modelo probabilístico de Okapi BM25~\cite{robertson1994okapi}
 implementado sobre índice invertido multi-campo com $k_1 = 1{,}5$ e $b = 0{,}75$;
 (2)~\textbf{TF-IDF}, similaridade de cosseno com esquema de ponderação log-tf
-(esquema \textit{ltc} do SMART~\cite{salton1975vector}) sobre o mesmo índice; e
+(esquema \textit{ltc} do SMART) sobre o mesmo índice; e
 (3)~\textbf{Busca Vetorial Densa}, modelo de recuperação semântica baseado em
 \textit{embeddings} de 384 dimensões gerados pelo
 \textit{paraphrase-multilingual-MiniLM-L12-v2}~\cite{reimers2019sentence} e
@@ -436,31 +437,13 @@ indisponibilidade do índice denso no ambiente de geração, este sistema não
 integra o \textit{pool} atual (ver Seção~\ref{sec:limitacoes}).
 
 Os sistemas esparsos (BM25 e TF-IDF) compartilham o mesmo índice invertido
-construído sobre os seis campos do corpus, com \textit{boosts} padrão
-apresentados na Tabela~\ref{tab:boostpool}. Para a composição do \textit{pool},
+construído sobre os seis campos do corpus, com os \textit{boosts} padrão já
+apresentados na Tabela~\ref{tab:weights}. Para a composição do \textit{pool},
 foi gerado um \textit{run file} adicional com a busca vetorial, perfazendo três
 arquivos de resultados no total.
 
-\begin{table}[ht]
-\centering
-\caption{\textit{Boosts} por campo no índice multi-campo (\textit{run files}).}
-\label{tab:boostpool}
-\begin{tabular}{lr}
-\toprule
-\textbf{Campo} & \textbf{Boost padrão} \\
-\midrule
-\texttt{lyrics}         & 4{,}00 \\
-\texttt{track\_name}    & 2{,}50 \\
-\texttt{artist\_genres} & 1{,}50 \\
-\texttt{artist\_names}  & 1{,}00 \\
-\texttt{macro\_genre}   & 1{,}00 \\
-\texttt{album\_name}    & 0{,}75 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 \paragraph{Estratégia de pooling.} A estratégia de
-\textit{pooling}~\cite{sparckjones1975ideal} consiste em executar cada sistema
+\textit{pooling} consiste em executar cada sistema
 sobre todas as consultas, coletar os $k$ documentos mais bem classificados por
 sistema e fazer a união dos conjuntos resultantes. Apenas os documentos
 presentes nessa união são submetidos a julgamento de relevância; os demais são
@@ -478,7 +461,7 @@ documentos mais populares do artista-alvo foram adicionados explicitamente ao
 \paragraph{Método de julgamento (\textit{silver standard}).} Dado o volume do
 corpus (36.017 documentos) e a ausência de assessores humanos disponíveis para a
 totalidade das consultas, adotou-se a abordagem de \textit{silver
-standard}~\cite{snow2008cheap}, na qual os julgamentos são gerados
+standard}, na qual os julgamentos são gerados
 automaticamente a partir de correspondência de metadados estruturados. Embora
 inferior ao julgamento humano em precisão, o \textit{silver standard} é
 amplamente empregado em cenários em que a anotação manual exaustiva é
@@ -494,6 +477,8 @@ detalha a distribuição por intenção de busca.
 
 \begin{table}[ht]
 \centering
+\begin{minipage}[t]{0.54\linewidth}
+\centering
 \caption{Estatísticas da coleção de referência.}
 \label{tab:stats}
 \begin{tabular}{lr}
@@ -502,24 +487,23 @@ detalha a distribuição por intenção de busca.
 \midrule
 Consultas (\textit{topics})                  & 50 \\
 Sistemas no \textit{pool}                     & 3 \\
-Pares (consulta, documento) julgados          & 1.604 \\
+Pares (consulta, doc.) julgados               & 1.604 \\
 Grau 2 --- Altamente relevante                & 380 (23{,}7\%) \\
 Grau 1 --- Parcialmente relevante             & 171 (10{,}7\%) \\
 Grau 0 --- Não relevante                      & 1.053 (65{,}6\%) \\
-Consultas com $\geq 1$ doc.\ relevante        & 50 (100\%) \\
-Média de docs.\ julgados por consulta         & 32{,}1 \\
-Média de docs.\ relevantes por consulta       & 11{,}0 \\
+Consultas com $\geq 1$ relevante              & 50 (100\%) \\
+Média de docs.\ julgados/consulta             & 32{,}1 \\
+Média de docs.\ relevantes/consulta           & 11{,}0 \\
 \bottomrule
 \end{tabular}
-\end{table}
-
-\begin{table}[ht]
+\end{minipage}\hfill
+\begin{minipage}[t]{0.44\linewidth}
 \centering
 \caption{Documentos relevantes por intenção de busca.}
 \label{tab:relintent}
 \begin{tabular}{lrrr}
 \toprule
-\textbf{Intent} & \textbf{N} & \textbf{Total rel.} & \textbf{Média rel./query} \\
+\textbf{Intent} & \textbf{N} & \textbf{Rel.} & \textbf{Méd./q} \\
 \midrule
 \textit{lyric}  & 15 & 33  & 2{,}2 \\
 \textit{track}  & 12 & 170 & 14{,}2 \\
@@ -530,6 +514,7 @@ Média de docs.\ relevantes por consulta       & 11{,}0 \\
 \textbf{Total}  & \textbf{50} & \textbf{551} & \textbf{11{,}0} \\
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{table}
 
 A menor densidade de relevantes nas consultas \textit{lyric} (média 2{,}2)
@@ -545,7 +530,7 @@ A coleção suporta o cômputo das seguintes métricas:
 \begin{itemize}
   \item \textbf{MRR} (\textit{Mean Reciprocal Rank}): média do recíproco da
     posição do primeiro documento relevante sobre o conjunto de
-    consultas~\cite{voorhees1999trec8}.
+    consultas.
   \item \textbf{P@10} (\textit{Precision at 10}): fração de documentos relevantes
     nos 10 primeiros resultados.
   \item \textbf{MAP} (\textit{Mean Average Precision}): média das precisões
@@ -623,16 +608,7 @@ aparece, em média, na segunda posição da lista. O TF-IDF manteve desempenho
 competitivo (nDCG@10 $= 0{,}4293$, diferença de $\approx$10\% em relação ao
 BM25). A busca densa, por outro lado, apresentou desempenho significativamente
 inferior em todas as métricas (nDCG@10 $= 0{,}1327$; MAP $= 0{,}0652$),
-representando menos de um terço do desempenho dos métodos esparsos. A
-Figura~\ref{fig:heatmap} sintetiza visualmente esse padrão.
-
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.95\linewidth]{figures/fig-heatmap-agregado.png}
-\caption{Mapa de calor com os valores de todas as métricas por sistema. Células
-com colchetes indicam o melhor valor em cada métrica.}
-\label{fig:heatmap}
-\end{figure}
+representando menos de um terço do desempenho dos métodos esparsos.
 
 \subsection{Resultados por Intenção de Busca}
 
@@ -657,41 +633,20 @@ o tipo de consulta.
 \end{tabular}
 \end{table}
 
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.95\linewidth]{figures/fig-ndcg-intent.png}
-\caption{nDCG@10 por intenção de busca e método de busca. Cada grupo de barras
-corresponde a uma categoria de \textit{intent}.}
-\label{fig:ndcgintent}
-\end{figure}
-
-A análise por \textit{intent} revela quatro padrões de especial relevância:
-
-\begin{itemize}
-  \item \textbf{Consultas de gênero (\textit{genre}):} os métodos esparsos
-    obtiveram nDCG@10 acima de $0{,}92$, confirmando que a correspondência pelo
-    campo \texttt{macro\_genre} é altamente eficaz. A busca densa, entretanto,
-    obteve apenas $0{,}0603$ --- o pior resultado individual de qualquer sistema
-    em qualquer \textit{intent}. Consultas categoriais como ``forró'' ou ``bossa
-    nova'' não são adequadamente tratadas por similaridade semântica: o espaço
-    vetorial contínuo não preserva as fronteiras de taxonomias categóricas
-    discretas.
-  \item \textbf{Consultas de letra (\textit{lyric}):} BM25 e TF-IDF obtiveram
-    nDCG@10 de $0{,}6348$ e $0{,}5064$, enquanto a busca densa alcançou apenas
-    $0{,}0936$. Esse resultado contraria a hipótese de que \textit{embeddings}
-    semânticos favoreceriam a busca por fragmentos de letra. O principal fator
-    limitante é que os julgamentos foram construídos por correspondência de
-    metadados (\textit{silver standard}), o que beneficia os métodos de
-    correspondência exata.
-  \item \textbf{Consultas de artista (\textit{artist}):} a busca densa obteve
-    seu melhor desempenho relativo ($0{,}1985$), mais próximo dos esparsos
-    (BM25: $0{,}2327$; TF-IDF: $0{,}2304$). Isso sugere que os \textit{embeddings}
-    multilíngues capturam alguma relação semântica entre artistas e seus estilos
-    musicais.
-  \item O TF-IDF supera o BM25 apenas nas consultas \textit{track} ($0{,}3133$
-    vs.\ $0{,}3019$), indicando que a similaridade de cosseno com log-tf captura
-    melhor a correspondência exata de termos em títulos de faixas.
-\end{itemize}
+A análise por \textit{intent} revela quatro padrões de especial relevância.
+\textbf{Gênero:} os métodos esparsos superam $0{,}92$, confirmando a eficácia da
+correspondência por \texttt{macro\_genre}, enquanto a busca densa obtém apenas
+$0{,}0603$ --- o pior resultado individual; o espaço vetorial contínuo não
+preserva as fronteiras de taxonomias categóricas discretas. \textbf{Letra:} BM25
+e TF-IDF ($0{,}6348$ e $0{,}5064$) batem amplamente a busca densa ($0{,}0936$),
+contrariando a hipótese de que \textit{embeddings} favoreceriam a busca por
+fragmentos de letra --- efeito do julgamento por metadados (\textit{silver
+standard}), que beneficia a correspondência exata. \textbf{Artista:} a busca
+densa tem aqui seu melhor desempenho relativo ($0{,}1985$, ante $0{,}2327$ e
+$0{,}2304$ dos esparsos), sugerindo que \textit{embeddings} multilíngues captam
+alguma relação entre artistas e estilos. Por fim, o \textbf{TF-IDF supera o BM25
+apenas em \textit{track}} ($0{,}3133$ vs.\ $0{,}3019$), pois a similaridade de
+cosseno com log-tf capta melhor a correspondência exata em títulos.
 
 \subsection{Distribuição dos Scores por Query e Análise Comparativa}
 
@@ -701,15 +656,6 @@ de \textit{scores} no quartil inferior, enquanto BM25 e TF-IDF exibem
 distribuições mais elevadas e comparáveis entre si. A maior parte da cauda
 superior do Dense corresponde a consultas de artista.
 
-\begin{figure}[ht]
-\centering
-\includegraphics[width=0.9\linewidth]{figures/fig-boxplot-query.png}
-\caption{Distribuição de nDCG@10 por \textit{query} para cada sistema. O
-triângulo vermelho representa a média; caixa $=$ IQR; bigodes $= 1{,}5\times$IQR;
-losangos $=$ \textit{outliers}.}
-\label{fig:boxplot}
-\end{figure}
-
 O \textit{scatter plot} (Figura~\ref{fig:scatter}) evidencia a dominância quase
 absoluta do BM25 sobre a busca densa: a grande maioria dos pontos está abaixo da
 diagonal $y = x$. Os raros pontos acima da diagonal concentram-se em consultas
@@ -718,11 +664,22 @@ relativo menos penalizado.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.78\linewidth]{figures/fig-scatter-bm25-dense.png}
+\begin{minipage}[b]{0.5\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/fig-boxplot-query.png}
+\caption{Distribuição de nDCG@10 por \textit{query} para cada sistema. Triângulo
+vermelho $=$ média; caixa $=$ IQR; bigodes $= 1{,}5\times$IQR; losangos $=$
+\textit{outliers}.}
+\label{fig:boxplot}
+\end{minipage}\hfill
+\begin{minipage}[b]{0.46\linewidth}
+\centering
+\includegraphics[width=\linewidth]{figures/fig-scatter-bm25-dense.png}
 \caption{Comparação \textit{query} a \textit{query} entre BM25 e busca densa em
-nDCG@10, colorida por \textit{intent}. Pontos acima da diagonal $y = x$ indicam
-consultas em que a busca densa supera o BM25.}
+nDCG@10, colorida por \textit{intent}. Pontos acima da diagonal $y = x$: a busca
+densa supera o BM25.}
 \label{fig:scatter}
+\end{minipage}
 \end{figure}
 
 \subsection{Testes de Significância Estatística}
@@ -783,48 +740,36 @@ contraria a tendência geral de adoção de \textit{retrieval} denso em RI moder
 
 \paragraph{Falha da busca densa em consultas categoriais.} O desempenho crítico
 da busca densa em \textit{genre} (nDCG@10 $= 0{,}0603$) explica grande parte do
-\textit{gap} agregado. Mesmo incluindo título, artista, \texttt{macro\_genre},
-\texttt{album\_name}, gêneros e 300 caracteres de letra no texto de
-\textit{embedding}, o desempenho em \textit{genre} permaneceu crítico. O modelo
+\textit{gap} agregado. Mesmo incluindo \texttt{macro\_genre} e 300 caracteres de
+letra no texto de \textit{embedding}, o modelo
 \textit{paraphrase-multilingual-MiniLM-L12-v2} captura similaridade semântica em
-letras, mas não a correspondência com rótulos categóricos discretos: a presença
-de \texttt{macro\_genre} no texto de \textit{embedding} não foi suficiente para
-preservar as fronteiras da taxonomia de gêneros no espaço vetorial contínuo.
+letras, mas não a correspondência com rótulos categóricos discretos --- não
+preservando as fronteiras da taxonomia de gêneros no espaço vetorial contínuo.
 
 \paragraph{Viés do \textit{silver standard} em favor dos métodos esparsos.} Os
 julgamentos foram construídos por correspondência de metadados --- exatamente o
-que BM25 e TF-IDF maximizam. A busca densa teria vantagem com julgamentos
-baseados em relevância semântica. Como trabalho futuro: (a)~avaliar modelos de
-\textit{embedding} especializados em música (CLAP, MusicBERT), cujo espaço
-vetorial preserva melhor a taxonomia de gêneros; (b)~adotar julgamentos humanos
-para eliminar o viés estrutural do \textit{silver standard}; e (c)~investigar
-abordagens híbridas que combinem filtro exato por \texttt{macro\_genre} com
-reescoragem densa. Recomenda-se a validação humana de uma amostra dos
-julgamentos antes do uso definitivo das métricas em publicação formal,
-especialmente para avaliar o potencial real da busca densa.
+que BM25 e TF-IDF maximizam ---, de modo que a busca densa teria vantagem sob
+julgamentos baseados em relevância semântica. Recomenda-se, assim, a validação
+humana de uma amostra dos julgamentos antes do uso definitivo das métricas em
+publicação formal, especialmente para avaliar o potencial real da busca densa.
 
 % =====================================================================
 \section{Conclusão}
 \label{sec:conclusao}
 % =====================================================================
 
-O desenvolvimento do Buscador de Músicas Brasileiras permitiu consolidar os
-conceitos teóricos ministrados na disciplina de Recuperação de Informação. A
-separação lógica e a atribuição de pesos customizados a índices multi-campo
-demonstraram que o conhecimento prévio sobre o domínio do problema melhora
-significativamente a ordenação dos resultados quando comparado a índices textuais
-genéricos. A avaliação quantitativa, conduzida sobre uma coleção de referência
-estilo TREC, mostrou que os métodos esparsos (BM25 e TF-IDF) superam a busca
-densa de forma estatisticamente significativa neste domínio e sob o protocolo de
-julgamento adotado, com o BM25 confirmando-se como a linha de base dominante.
-
-Como trabalhos futuros, aponta-se a exploração de técnicas avançadas de
-\textit{re-ranking} por meio de algoritmos de \textit{Learning to Rank} (LTR)
-utilizando \textit{frameworks} de árvores de decisão e algoritmos genéticos, bem
-como a transição do sistema de busca para um ecossistema completo de Geração
-Aumentada por Recuperação (RAG) voltado a assistentes musicais conversacionais.
-A adoção de julgamentos humanos e de modelos de \textit{embedding} especializados
-em música permitiria avaliar com maior justiça o potencial da busca densa.
+O desenvolvimento do Buscador de Músicas Brasileiras consolidou na prática os
+conceitos da disciplina de Recuperação de Informação. A atribuição de pesos
+customizados a índices multi-campo melhorou significativamente a ordenação frente
+a índices textuais genéricos, e a avaliação quantitativa estilo TREC mostrou que
+os métodos esparsos (BM25 e TF-IDF) superam a busca densa de forma
+estatisticamente significativa neste domínio e sob o protocolo adotado, com o
+BM25 confirmando-se como a linha de base dominante. Como trabalhos futuros,
+apontam-se o \textit{re-ranking} via \textit{Learning to Rank} (LTR), a transição
+para um ecossistema de Geração Aumentada por Recuperação (RAG) voltado a
+assistentes musicais conversacionais, e a adoção de julgamentos humanos e de
+modelos de \textit{embedding} especializados em música, que permitiriam avaliar
+com maior justiça o potencial da busca densa.
 
 % =====================================================================
 \bibliographystyle{plain}
