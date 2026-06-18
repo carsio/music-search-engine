@@ -289,9 +289,11 @@ def search(
     # Para tracks, o hit vem do SparseSearchEngine ja como dict completo —
     # injetamos um campo `kind` para o conversor.
     hits = []
-    for h in routed["hits"]:
+    routed_hits = cast(list[dict[str, Any]], routed["hits"])
+    for raw_hit in routed_hits:
+        h = dict(raw_hit)
         if intent_used == "track":
-            h = {**h, "kind": "track"}
+            h["kind"] = "track"
         hits.append(hit_to_item(h))
 
     elapsed = int((time.time() - started) * 1000)

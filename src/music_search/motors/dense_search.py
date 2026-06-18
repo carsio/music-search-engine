@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pickle
 from dataclasses import dataclass, field
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,14 @@ _SLIM_KEYS = (
     "lyrics_source",
     "lyrics_source_url",
 )
+
+
+def _load_faiss() -> Any:
+    return import_module("faiss")
+
+
+def _load_sentence_transformer() -> Any:
+    return import_module("sentence_transformers").SentenceTransformer
 
 
 def _track_text(r: dict[str, Any]) -> str:
@@ -74,8 +83,7 @@ class DenseSearchEngine:
 
     def _get_model(self) -> Any:
         if self._model is None:
-            from sentence_transformers import SentenceTransformer
-
+            SentenceTransformer = _load_sentence_transformer()
             self._model = SentenceTransformer(self.model_name)
         return self._model
 
@@ -110,8 +118,7 @@ class DenseSearchEngine:
         index_path: Path = DEFAULT_DENSE_INDEX_PATH,
         meta_path: Path = DEFAULT_DENSE_META_PATH,
     ) -> None:
-        import faiss
-
+        faiss = _load_faiss()
         index_path.parent.mkdir(parents=True, exist_ok=True)
         faiss.write_index(self.index, str(index_path))
         with meta_path.open("wb") as f:
@@ -131,8 +138,7 @@ class DenseSearchEngine:
         index_path: Path = DEFAULT_DENSE_INDEX_PATH,
         meta_path: Path = DEFAULT_DENSE_META_PATH,
     ) -> DenseSearchEngine:
-        import faiss
-
+        faiss = _load_faiss()
         index = faiss.read_index(str(index_path))
         with meta_path.open("rb") as f:
             meta = pickle.load(f)
@@ -152,9 +158,8 @@ class DenseSearchEngine:
         batch_size: int = 256,
     ) -> DenseSearchEngine:
         """Constrói índice FAISS a partir de dicts de track (com campo 'lyrics')."""
-        import faiss
-        from sentence_transformers import SentenceTransformer
-
+        faiss = _load_faiss()
+        SentenceTransformer = _load_sentence_transformer()
         model = SentenceTransformer(model_name)
         doc_ids: list[str] = []
         texts: list[str] = []
