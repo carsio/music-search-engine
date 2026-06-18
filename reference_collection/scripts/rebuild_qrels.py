@@ -1,11 +1,16 @@
 """Re-gera apenas o qrels.tsv a partir dos run files existentes, sem re-executar o pooling."""
-import sys, csv, unicodedata, re
-from pathlib import Path
-from collections import defaultdict
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
+from __future__ import annotations
+
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+import duckdb
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
-OUTPUT_DIR = REPO_ROOT / "colecao_referencia"
+OUTPUT_DIR = REPO_ROOT / "reference_collection"
 
 # ── importa helpers do script principal ───────────────────────────────────────
 spec = __import__("importlib.util").util.spec_from_file_location(
@@ -14,28 +19,35 @@ spec = __import__("importlib.util").util.spec_from_file_location(
 mod = __import__("importlib.util").util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
-TOPICS    = mod.TOPICS
+TOPICS = mod.TOPICS
 normalize = mod.normalize
 assign_grade = mod.assign_grade
 
-# ── lê os run files e reconstrói pool ─────────────────────────────────────────
-import duckdb
 path = str(REPO_ROOT / "data/derived/final/br_curated_lyrics.parquet")
-con  = duckdb.connect()
+con = duckdb.connect()
+
 
 def doc_meta(doc_id: str) -> dict:
-    row = con.execute(f"""
+    row = con.execute(
+        f"""
         SELECT id, track_name, primary_artist_name, artist_names,
                artist_genres, macro_genre, album_name
         FROM '{path}' WHERE id=?
-    """, [doc_id]).fetchone()
+    """,
+        [doc_id],
+    ).fetchone()
     if not row:
         return {}
     return {
-        "id": row[0], "track_name": row[1], "primary_artist_name": row[2],
-        "artist_names": row[3], "artist_genres": row[4],
-        "macro_genre": row[5], "album_name": row[6],
+        "id": row[0],
+        "track_name": row[1],
+        "primary_artist_name": row[2],
+        "artist_names": row[3],
+        "artist_genres": row[4],
+        "macro_genre": row[5],
+        "album_name": row[6],
     }
+
 
 pool: dict[str, set[str]] = defaultdict(set)
 for run_file in (OUTPUT_DIR / "runs").glob("*.txt"):
@@ -53,11 +65,14 @@ for topic in TOPICS:
     if known_doc_id:
         pool[qid].add(known_doc_id)
     if known_artist and intent in ("artist", "track"):
-        rows = con.execute(f"""
+        rows = con.execute(
+            f"""
             SELECT id FROM '{path}'
             WHERE primary_artist_name = ?
             ORDER BY track_popularity DESC LIMIT 10
-        """, [known_artist]).fetchall()
+        """,
+            [known_artist],
+        ).fetchall()
         for (doc_id,) in rows:
             pool[qid].add(doc_id)
 
@@ -78,7 +93,14 @@ with (OUTPUT_DIR / "qrels.tsv").open("w", encoding="utf-8") as f:
             doc_data = doc_meta(doc_id)
             if not doc_data:
                 continue
-            grade = assign_grade(doc_data, intent, known_doc_id, known_artist, known_genre, known_album)
+            grade = assign_grade(
+                doc_data,
+                intent,
+                known_doc_id,
+                known_artist,
+                known_genre,
+                known_album,
+            )
             f.write(f"{qid}\t0\t{doc_id}\t{grade}\n")
             stats["total"] += 1
             stats[f"grade{grade}"] += 1

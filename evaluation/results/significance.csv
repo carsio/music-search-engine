@@ -1,4 +1,4 @@
-Sistema 1,Sistema 2,Métrica,Média S1,Média S2,Melhor,W,p-valor,Sig α=0.05,Sig Bonf.
+Sistema 1,Sistema 2,Métrica,Média S1,Média S2,Melhor,W,p-valor,Sig alpha=0.05,Sig Bonf.
 BM25,TF-IDF,nDCG@10,0.4767,0.4293,BM25,100.0,0.01106,Sim,Não
 BM25,TF-IDF,MAP,0.3603,0.3244,BM25,258.0,0.15837,Não,Não
 BM25,TF-IDF,MRR,0.6091,0.566,BM25,89.5,0.36568,Não,Não

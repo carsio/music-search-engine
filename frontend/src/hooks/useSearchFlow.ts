@@ -18,6 +18,7 @@ export interface SearchFlowResult {
 }
 
 export function useSearchFlow(query: string, settings: SearchSettings): SearchFlowResult {
+  const lyricAlgorithm = settings.algorithm === "dense" ? "bm25" : settings.algorithm;
   const search = useSearch(query, {
     algorithm: settings.algorithm,
     top: settings.top,
@@ -44,7 +45,7 @@ export function useSearchFlow(query: string, settings: SearchSettings): SearchFl
 
   const lyric = useLyricSearch(query, {
     enabled: intent === "lyric" && query.trim().length > 0,
-    algorithm: settings.algorithm,
+    algorithm: lyricAlgorithm,
     top: Math.max(settings.top, settings.maxSnippets),
     profile: settings.profile,
     bm25K1: settings.bm25K1,

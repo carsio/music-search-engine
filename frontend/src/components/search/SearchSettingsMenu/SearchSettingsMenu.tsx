@@ -12,6 +12,7 @@ import styles from "./SearchSettingsMenu.module.css";
 
 interface SearchSettingsMenuProps {
   settings: SearchSettings;
+  denseAvailable: boolean;
   hasActiveOverrides: boolean;
   onUpdate: (patch: Partial<SearchSettings>) => void;
   onReset: () => void;
@@ -46,6 +47,7 @@ function formatAlgorithmLabel(settings: SearchSettings) {
 
 export function SearchSettingsMenu({
   settings,
+  denseAvailable,
   hasActiveOverrides,
   onUpdate,
   onReset,
@@ -144,12 +146,14 @@ export function SearchSettingsMenu({
               >
                 TF-IDF
               </Chip>
-              <Chip
-                active={settings.algorithm === "dense"}
-                onClick={() => onUpdate({ algorithm: "dense" })}
-              >
-                Vetorial Densa
-              </Chip>
+              {denseAvailable ? (
+                <Chip
+                  active={settings.algorithm === "dense"}
+                  onClick={() => onUpdate({ algorithm: "dense" })}
+                >
+                  Vetorial Densa
+                </Chip>
+              ) : null}
             </div>
 
             <label className={styles.rangeField}>

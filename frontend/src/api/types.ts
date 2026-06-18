@@ -134,4 +134,8 @@ export interface HealthResponse {
   ok: boolean;
   tracks_indexed: number;
   entities: Record<string, number>;
+  dense_search?: {
+    available: boolean;
+    tracks_indexed: number;
+  };
 }

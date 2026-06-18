@@ -12,6 +12,7 @@ import type {
 import type { SearchProfile, SearchTfScheme } from "../hooks/useSearchSettings";
 
 type Opts<T> = Pick<UseQueryOptions<T>, "enabled" | "staleTime">;
+type SparseSearchAlgorithm = Exclude<SearchAlgorithm, "dense">;
 
 interface SearchOpts extends Opts<SearchResponse> {
   algorithm?: SearchAlgorithm;
@@ -39,12 +40,6 @@ export function useSearch(query: string, opts: SearchOpts = {}) {
     placeholderData: (prev) => prev,
     queryKey: ["search", query, algorithm, top, profile, bm25K1, bm25B, tfScheme],
     queryFn: async () => {
-      if (algorithm === "dense") {
-        const { data } = await api.get<SearchResponse>("/search/dense", {
-          params: { q: query, top },
-        });
-        return data;
-      }
       const { data } = await api.get<SearchResponse>("/search", {
         params: {
           q: query,
@@ -62,7 +57,7 @@ export function useSearch(query: string, opts: SearchOpts = {}) {
 }
 
 interface LyricOpts extends Opts<LyricSearchResponse> {
-  algorithm?: SearchAlgorithm;
+  algorithm?: SparseSearchAlgorithm;
   top?: number;
   profile?: SearchProfile;
   bm25K1?: number;

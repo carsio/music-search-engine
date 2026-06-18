@@ -234,14 +234,24 @@ def healthz() -> dict[str, Any]:
     multi = getattr(app.state, "multi", None)
     entity_indexes = getattr(multi, "entity_indexes", {}) or {}
     entities = {k: v.num_docs for k, v in entity_indexes.items()}
-    return {"ok": True, "tracks_indexed": tracks, "entities": entities}
+    dense_engine = getattr(app.state, "dense_engine", None)
+    dense_docs = int(getattr(dense_engine, "num_docs", 0) or 0)
+    return {
+        "ok": True,
+        "tracks_indexed": tracks,
+        "entities": entities,
+        "dense_search": {
+            "available": dense_engine is not None,
+            "tracks_indexed": dense_docs,
+        },
+    }
 
 
 @app.get("/api/search", response_model=SearchResponse)
 def search(
     q: Annotated[str, Query(min_length=1, max_length=200)],
     top: Annotated[int, Query(ge=1, le=50)] = 10,
-    algorithm: Annotated[str, Query(pattern="^(bm25|tfidf)$")] = "bm25",
+    algorithm: Annotated[str, Query(pattern="^(bm25|tfidf|dense)$")] = "bm25",
     profile: Annotated[SearchProfile, Query()] = "balanced",
     bm25_k1: Annotated[float, Query(gt=0.0, le=3.0)] = 1.5,
     bm25_b: Annotated[float, Query(ge=0.0, le=1.0)] = 0.75,
@@ -249,12 +259,13 @@ def search(
 ) -> SearchResponse:
     started = time.time()
     intent = heuristic_intent(q)
+    sparse_algorithm = "bm25" if algorithm == "dense" else algorithm
 
     multi: MultiEntityIndex = app.state.multi
     routed = multi.search_routed(
         q,
         intent,
-        algorithm=algorithm,  # type: ignore[arg-type]
+        algorithm=sparse_algorithm,  # type: ignore[arg-type]
         top_k=top,
         profile=profile,
         bm25_k1=bm25_k1,
@@ -262,6 +273,18 @@ def search(
         tf_scheme=tf_scheme,
     )
     intent_used = routed["intent_used"]
+    response_algorithm = sparse_algorithm
+
+    if algorithm == "dense":
+        dense_engine = getattr(app.state, "dense_engine", None)
+        if dense_engine is None:
+            raise HTTPException(503, "motor de busca vetorial não disponível")
+        if intent_used == "track":
+            routed = {
+                "intent_used": "track",
+                "hits": [h.to_dict() for h in dense_engine.search(q, top_k=top)],
+            }
+            response_algorithm = "dense"
 
     # Para tracks, o hit vem do SparseSearchEngine ja como dict completo —
     # injetamos um campo `kind` para o conversor.
@@ -276,7 +299,7 @@ def search(
         query=q,
         intent_requested=cast(Intent, intent),
         intent_used=cast(Intent, intent_used),
-        algorithm=cast(SearchAlgorithm, algorithm),
+        algorithm=cast(SearchAlgorithm, response_algorithm),
         items=hits,
         rerank_used=False,
         elapsed_ms=elapsed,

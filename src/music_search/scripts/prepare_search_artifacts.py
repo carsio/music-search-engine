@@ -21,7 +21,10 @@ def _build_dense(track_engine: object) -> None:
             DenseSearchEngine,
         )
     except ImportError:
-        print("[prepare_search_artifacts] sentence-transformers/faiss não instalados — pulando índice denso")
+        print(
+            "[prepare_search_artifacts] sentence-transformers/faiss não instalados — "
+            "pulando índice denso"
+        )
         return
 
     records = list(getattr(track_engine, "documents", {}).values())
@@ -33,7 +36,10 @@ def _build_dense(track_engine: object) -> None:
     print(f"[prepare_search_artifacts] construindo índice denso ({len(records)} docs)...")
     engine = DenseSearchEngine.build(records)
     engine.save(DEFAULT_DENSE_INDEX_PATH, DEFAULT_DENSE_META_PATH)
-    print(f"[prepare_search_artifacts] índice denso: {engine.num_docs} docs ({time.perf_counter() - t0:.1f}s)")
+    print(
+        f"[prepare_search_artifacts] índice denso: {engine.num_docs} docs "
+        f"({time.perf_counter() - t0:.1f}s)"
+    )
 
 
 def main() -> None:

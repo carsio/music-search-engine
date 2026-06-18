@@ -18,19 +18,18 @@ Pré-requisito para runs/dense.txt:
 
 from __future__ import annotations
 
-import sys
-import os
-from pathlib import Path
-from collections import defaultdict
-import unicodedata
 import re
+import sys
+import unicodedata
+from collections import defaultdict
+from pathlib import Path
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
-OUTPUT_DIR       = REPO_ROOT / "colecao_referencia"
+OUTPUT_DIR = REPO_ROOT / "reference_collection"
 DENSE_INDEX_PATH = REPO_ROOT / "data" / "indexes" / "dense_index.faiss"
-DENSE_META_PATH  = REPO_ROOT / "data" / "indexes" / "dense_meta.pkl"
+DENSE_META_PATH = REPO_ROOT / "data" / "indexes" / "dense_meta.pkl"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 (OUTPUT_DIR / "runs").mkdir(exist_ok=True)
 
@@ -41,213 +40,515 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 TOPICS = [
     # ── LYRIC (15) ────────────────────────────────────────────────────────────
-    ("Q001", "não sabe o que é sofrer ter que ver você sempre tão linda",
-     "Usuário lembra de um trecho de uma música romântica MPB sobre alguém lindo que causa sofrimento.",
-     "lyric", "0aASUtDb1N96NJDwmWj5Gf", "Los Hermanos", None, None),
-
-    ("Q002", "vida loka sofrimento e glória da favela",
-     "Usuário busca músicas de rap nacional que falam sobre a vida difícil nas periferias brasileiras.",
-     "lyric", "6m8AgjfI28ER6odzMxmHtR", "Racionais MC's", None, None),
-
-    ("Q003", "velha infância tribalistas",
-     "Usuário quer encontrar a música sobre infância e nostalgia dos Tribalistas.",
-     "lyric", "1mSxbLW7fKABfeY4lGpg0E", "Tribalistas", None, None),
-
-    ("Q004", "ela quer rolar na minha silverado cowboy",
-     "Usuário quer encontrar uma música sertaneja sobre caminhonete e vida de cowboy.",
-     "lyric", "26l5FAEVr9cfaILS0szvvt", "Luan Pereira", None, None),
-
-    ("Q005", "depois de tantos planos de um futuro para nós nos abandonamos",
-     "Usuário lembra de trecho de música sobre o fim de um relacionamento longo.",
-     "lyric", "2yeI0FRWd1sqGpHEUc5DFm", "Marisa Monte", None, None),
-
-    ("Q006", "me encontra que espero a tanto tempo em meio à multidão",
-     "Usuário busca a música do Charlie Brown Jr sobre esperar alguém especial.",
-     "lyric", "5yEais1zgeW1MjLrx7tsie", "Charlie Brown Jr.", None, None),
-
-    ("Q007", "um minuto para o fim do mundo punk rock",
-     "Usuário busca música de rock brasileiro sobre urgência e fim do mundo.",
-     "lyric", "7ATfTQCF4OGSY91yKk42km", "CPM 22", None, None),
-
-    ("Q008", "louca por ti amor demais na praia nos dois",
-     "Usuário busca música de forró ou arrocha sobre amor intenso à beira-mar.",
-     "lyric", "21KbWPoY3MTpI5byU6d0dl", "Calcinha Preta", None, None),
-
-    ("Q009", "há um vento fresco algo maravilhoso está por vir gospel",
-     "Usuário busca música gospel de adoração sobre renovação e esperança.",
-     "lyric", "6fP2IJGSEvzIFEGJDNWvf4", "Get Worship", None, None),
-
-    ("Q010", "coração partido não me acostumei dividir você pagode",
-     "Usuário busca pagode que fala sobre o sofrimento de dividir o amor com outra pessoa.",
-     "lyric", "2sC9NcBWmZX2gt3gM0ZEmo", "Thiaguinho", None, None),
-
-    ("Q011", "amor o meu coração pede só pra te amar ficar com você meu anjo",
-     "Usuário busca música de forró romântico sobre querer amar e ficar com alguém.",
-     "lyric", "5wV5dO1GOI4srs4Um5cJXo", "Junior Lima", None, None),
-
-    ("Q012", "cedo ou tarde vamos nos encontrar rock nacional",
-     "Usuário busca música de rock nacional sobre destino e encontro inevitável.",
-     "lyric", "4RzFPIpnYo7vf0kQI8Gdg1", "NX Zero", None, None),
-
-    ("Q013", "poderosa olhar de diamante agita o salão funk",
-     "Usuário lembra de funk dos anos 2000 que elogia mulher elegante e poderosa.",
-     "lyric", "2UeJXZ4W2gQw94Jcm2BlQ9", "MC Marcinho", None, None),
-
-    ("Q014", "vai e vem não sai de órbita eita vida torta sertanejo",
-     "Usuário busca música sertaneja de Marília Mendonça sobre relacionamento complicado.",
-     "lyric", "4a5GPCo8oX4vvaRkciKlih", "Marília Mendonça", None, None),
-
-    ("Q015", "mesmo que eu vá correndo sem direção ainda assim vou lutar gospel",
-     "Usuário busca música gospel sobre perseverança mesmo sem direção clara.",
-     "lyric", "726jL4DA03vptKr05so4Zu", "Central 3", None, None),
-
+    (
+        "Q001",
+        "não sabe o que é sofrer ter que ver você sempre tão linda",
+        "Usuário lembra de um trecho de uma música romântica MPB sobre alguém lindo.",
+        "lyric",
+        "0aASUtDb1N96NJDwmWj5Gf",
+        "Los Hermanos",
+        None,
+        None,
+    ),
+    (
+        "Q002",
+        "vida loka sofrimento e glória da favela",
+        "Usuário busca rap nacional sobre vida difícil nas periferias brasileiras.",
+        "lyric",
+        "6m8AgjfI28ER6odzMxmHtR",
+        "Racionais MC's",
+        None,
+        None,
+    ),
+    (
+        "Q003",
+        "velha infância tribalistas",
+        "Usuário quer encontrar a música sobre infância e nostalgia dos Tribalistas.",
+        "lyric",
+        "1mSxbLW7fKABfeY4lGpg0E",
+        "Tribalistas",
+        None,
+        None,
+    ),
+    (
+        "Q004",
+        "ela quer rolar na minha silverado cowboy",
+        "Usuário quer encontrar uma música sertaneja sobre caminhonete e vida de cowboy.",
+        "lyric",
+        "26l5FAEVr9cfaILS0szvvt",
+        "Luan Pereira",
+        None,
+        None,
+    ),
+    (
+        "Q005",
+        "depois de tantos planos de um futuro para nós nos abandonamos",
+        "Usuário lembra de trecho de música sobre o fim de um relacionamento longo.",
+        "lyric",
+        "2yeI0FRWd1sqGpHEUc5DFm",
+        "Marisa Monte",
+        None,
+        None,
+    ),
+    (
+        "Q006",
+        "me encontra que espero a tanto tempo em meio à multidão",
+        "Usuário busca a música do Charlie Brown Jr sobre esperar alguém especial.",
+        "lyric",
+        "5yEais1zgeW1MjLrx7tsie",
+        "Charlie Brown Jr.",
+        None,
+        None,
+    ),
+    (
+        "Q007",
+        "um minuto para o fim do mundo punk rock",
+        "Usuário busca música de rock brasileiro sobre urgência e fim do mundo.",
+        "lyric",
+        "7ATfTQCF4OGSY91yKk42km",
+        "CPM 22",
+        None,
+        None,
+    ),
+    (
+        "Q008",
+        "louca por ti amor demais na praia nos dois",
+        "Usuário busca música de forró ou arrocha sobre amor intenso à beira-mar.",
+        "lyric",
+        "21KbWPoY3MTpI5byU6d0dl",
+        "Calcinha Preta",
+        None,
+        None,
+    ),
+    (
+        "Q009",
+        "há um vento fresco algo maravilhoso está por vir gospel",
+        "Usuário busca música gospel de adoração sobre renovação e esperança.",
+        "lyric",
+        "6fP2IJGSEvzIFEGJDNWvf4",
+        "Get Worship",
+        None,
+        None,
+    ),
+    (
+        "Q010",
+        "coração partido não me acostumei dividir você pagode",
+        "Usuário busca pagode que fala sobre o sofrimento de dividir o amor com outra pessoa.",
+        "lyric",
+        "2sC9NcBWmZX2gt3gM0ZEmo",
+        "Thiaguinho",
+        None,
+        None,
+    ),
+    (
+        "Q011",
+        "amor o meu coração pede só pra te amar ficar com você meu anjo",
+        "Usuário busca música de forró romântico sobre querer amar e ficar com alguém.",
+        "lyric",
+        "5wV5dO1GOI4srs4Um5cJXo",
+        "Junior Lima",
+        None,
+        None,
+    ),
+    (
+        "Q012",
+        "cedo ou tarde vamos nos encontrar rock nacional",
+        "Usuário busca música de rock nacional sobre destino e encontro inevitável.",
+        "lyric",
+        "4RzFPIpnYo7vf0kQI8Gdg1",
+        "NX Zero",
+        None,
+        None,
+    ),
+    (
+        "Q013",
+        "poderosa olhar de diamante agita o salão funk",
+        "Usuário lembra de funk dos anos 2000 que elogia mulher elegante e poderosa.",
+        "lyric",
+        "2UeJXZ4W2gQw94Jcm2BlQ9",
+        "MC Marcinho",
+        None,
+        None,
+    ),
+    (
+        "Q014",
+        "vai e vem não sai de órbita eita vida torta sertanejo",
+        "Usuário busca música sertaneja de Marília Mendonça sobre relacionamento complicado.",
+        "lyric",
+        "4a5GPCo8oX4vvaRkciKlih",
+        "Marília Mendonça",
+        None,
+        None,
+    ),
+    (
+        "Q015",
+        "mesmo que eu vá correndo sem direção ainda assim vou lutar gospel",
+        "Usuário busca música gospel sobre perseverança mesmo sem direção clara.",
+        "lyric",
+        "726jL4DA03vptKr05so4Zu",
+        "Central 3",
+        None,
+        None,
+    ),
     # ── TRACK (12) ────────────────────────────────────────────────────────────
-    ("Q016", "Anna Júlia Los Hermanos",
-     "Usuário quer encontrar a música 'Anna Júlia' da banda Los Hermanos.",
-     "track", "0aASUtDb1N96NJDwmWj5Gf", "Los Hermanos", None, None),
-
-    ("Q017", "Velha Infância Tribalistas",
-     "Usuário quer a música 'Velha Infância' do grupo Tribalistas.",
-     "track", "1mSxbLW7fKABfeY4lGpg0E", "Tribalistas", None, None),
-
-    ("Q018", "Vida Loka Racionais MC's",
-     "Usuário procura 'Vida Loka Pt. 1' dos Racionais MC's.",
-     "track", "6m8AgjfI28ER6odzMxmHtR", "Racionais MC's", None, None),
-
-    ("Q019", "Dormi Na Praça Chitãozinho Xororó",
-     "Usuário busca a música 'Dormi Na Praça' da dupla sertaneja Chitãozinho & Xororó.",
-     "track", "0lqth62FJY6QobobChvnzB", "Chitãozinho & Xororó", None, None),
-
-    ("Q020", "Obrigado por Estragar Tudo Marília Mendonça",
-     "Usuário quer encontrar a música da Marília Mendonça sobre término de relacionamento.",
-     "track", "4a5GPCo8oX4vvaRkciKlih", "Marília Mendonça", None, None),
-
-    ("Q021", "Me Ama Ou Me Larga Simone Mendes",
-     "Usuário busca a música 'Me Ama Ou Me Larga' de Simone Mendes.",
-     "track", "2TSYxcrcrtLpdbsLY9NmzL", "Simone Mendes", None, None),
-
-    ("Q022", "Apaguei Pra Todos Ferrugem",
-     "Usuário quer a música 'Apaguei Pra Todos' do cantor Ferrugem.",
-     "track", "65vJAh07BdwurqR9SRa6f8", "Ferrugem", None, None),
-
-    ("Q023", "Dias Atrás CPM 22",
-     "Usuário busca a música 'Dias Atrás' da banda de rock CPM 22.",
-     "track", "7hjAhjnMzpMT9vU54w0LYF", "CPM 22", None, None),
-
-    ("Q024", "Depois Marisa Monte",
-     "Usuário quer a música 'Depois' de Marisa Monte sobre fim de um amor.",
-     "track", "2yeI0FRWd1sqGpHEUc5DFm", "Marisa Monte", None, None),
-
-    ("Q025", "Ovelhinha Isadora Pompeo",
-     "Usuário busca a música gospel 'Ovelhinha' de Isadora Pompeo.",
-     "track", "2lKiWWoeqOHhXwyZT8flw6", "Isadora Pompeo", None, None),
-
-    ("Q026", "Silverado Luan Pereira sertanejo",
-     "Usuário quer encontrar a música 'Silverado' do sertanejo Luan Pereira.",
-     "track", "26l5FAEVr9cfaILS0szvvt", "Luan Pereira", None, None),
-
-    ("Q027", "Insônia Tribo da Periferia rap",
-     "Usuário busca a música 'Insônia' do grupo de rap Tribo da Periferia.",
-     "track", "5G3ZjUMOlOpChRHpdlGALj", "Tribo da Periferia", None, None),
-
+    (
+        "Q016",
+        "Anna Júlia Los Hermanos",
+        "Usuário quer encontrar a música 'Anna Júlia' da banda Los Hermanos.",
+        "track",
+        "0aASUtDb1N96NJDwmWj5Gf",
+        "Los Hermanos",
+        None,
+        None,
+    ),
+    (
+        "Q017",
+        "Velha Infância Tribalistas",
+        "Usuário quer a música 'Velha Infância' do grupo Tribalistas.",
+        "track",
+        "1mSxbLW7fKABfeY4lGpg0E",
+        "Tribalistas",
+        None,
+        None,
+    ),
+    (
+        "Q018",
+        "Vida Loka Racionais MC's",
+        "Usuário procura 'Vida Loka Pt. 1' dos Racionais MC's.",
+        "track",
+        "6m8AgjfI28ER6odzMxmHtR",
+        "Racionais MC's",
+        None,
+        None,
+    ),
+    (
+        "Q019",
+        "Dormi Na Praça Chitãozinho Xororó",
+        "Usuário busca a música 'Dormi Na Praça' da dupla sertaneja Chitãozinho & Xororó.",
+        "track",
+        "0lqth62FJY6QobobChvnzB",
+        "Chitãozinho & Xororó",
+        None,
+        None,
+    ),
+    (
+        "Q020",
+        "Obrigado por Estragar Tudo Marília Mendonça",
+        "Usuário quer encontrar a música da Marília Mendonça sobre término de relacionamento.",
+        "track",
+        "4a5GPCo8oX4vvaRkciKlih",
+        "Marília Mendonça",
+        None,
+        None,
+    ),
+    (
+        "Q021",
+        "Me Ama Ou Me Larga Simone Mendes",
+        "Usuário busca a música 'Me Ama Ou Me Larga' de Simone Mendes.",
+        "track",
+        "2TSYxcrcrtLpdbsLY9NmzL",
+        "Simone Mendes",
+        None,
+        None,
+    ),
+    (
+        "Q022",
+        "Apaguei Pra Todos Ferrugem",
+        "Usuário quer a música 'Apaguei Pra Todos' do cantor Ferrugem.",
+        "track",
+        "65vJAh07BdwurqR9SRa6f8",
+        "Ferrugem",
+        None,
+        None,
+    ),
+    (
+        "Q023",
+        "Dias Atrás CPM 22",
+        "Usuário busca a música 'Dias Atrás' da banda de rock CPM 22.",
+        "track",
+        "7hjAhjnMzpMT9vU54w0LYF",
+        "CPM 22",
+        None,
+        None,
+    ),
+    (
+        "Q024",
+        "Depois Marisa Monte",
+        "Usuário quer a música 'Depois' de Marisa Monte sobre fim de um amor.",
+        "track",
+        "2yeI0FRWd1sqGpHEUc5DFm",
+        "Marisa Monte",
+        None,
+        None,
+    ),
+    (
+        "Q025",
+        "Ovelhinha Isadora Pompeo",
+        "Usuário busca a música gospel 'Ovelhinha' de Isadora Pompeo.",
+        "track",
+        "2lKiWWoeqOHhXwyZT8flw6",
+        "Isadora Pompeo",
+        None,
+        None,
+    ),
+    (
+        "Q026",
+        "Silverado Luan Pereira sertanejo",
+        "Usuário quer encontrar a música 'Silverado' do sertanejo Luan Pereira.",
+        "track",
+        "26l5FAEVr9cfaILS0szvvt",
+        "Luan Pereira",
+        None,
+        None,
+    ),
+    (
+        "Q027",
+        "Insônia Tribo da Periferia rap",
+        "Usuário busca a música 'Insônia' do grupo de rap Tribo da Periferia.",
+        "track",
+        "5G3ZjUMOlOpChRHpdlGALj",
+        "Tribo da Periferia",
+        None,
+        None,
+    ),
     # ── ARTIST (10) ───────────────────────────────────────────────────────────
-    ("Q028", "Djavan",
-     "Usuário quer músicas do cantor e compositor Djavan, referência da MPB.",
-     "artist", None, "Djavan", None, None),
-
-    ("Q029", "Racionais MC's rap",
-     "Usuário quer músicas do grupo Racionais MC's, ícone do rap nacional.",
-     "artist", None, "Racionais MC's", None, None),
-
-    ("Q030", "Marília Mendonça sertanejo feminejo",
-     "Usuário quer ouvir músicas da cantora sertaneja Marília Mendonça.",
-     "artist", None, "Marília Mendonça", None, None),
-
-    ("Q031", "Chitãozinho e Xororó dupla sertaneja",
-     "Usuário quer músicas da dupla sertaneja clássica Chitãozinho & Xororó.",
-     "artist", None, "Chitãozinho & Xororó", None, None),
-
-    ("Q032", "Tribalistas MPB",
-     "Usuário quer músicas do grupo Tribalistas formado por Carlinhos Brown, Marisa Monte e Arnaldo Antunes.",
-     "artist", None, "Tribalistas", None, None),
-
-    ("Q033", "CPM 22 rock nacional",
-     "Usuário quer músicas da banda de rock CPM 22.",
-     "artist", None, "CPM 22", None, None),
-
-    ("Q034", "Ferrugem pagode",
-     "Usuário quer músicas do cantor de pagode Ferrugem.",
-     "artist", None, "Ferrugem", None, None),
-
-    ("Q035", "Calcinha Preta forró",
-     "Usuário quer músicas da banda de forró Calcinha Preta.",
-     "artist", None, "Calcinha Preta", None, None),
-
-    ("Q036", "Isadora Pompeo gospel",
-     "Usuário quer músicas da cantora gospel Isadora Pompeo.",
-     "artist", None, "Isadora Pompeo", None, None),
-
-    ("Q037", "Jorge e Mateus sertanejo",
-     "Usuário quer músicas da dupla sertaneja Jorge & Mateus.",
-     "artist", None, "Jorge & Mateus", None, None),
-
+    (
+        "Q028",
+        "Djavan",
+        "Usuário quer músicas do cantor e compositor Djavan, referência da MPB.",
+        "artist",
+        None,
+        "Djavan",
+        None,
+        None,
+    ),
+    (
+        "Q029",
+        "Racionais MC's rap",
+        "Usuário quer músicas do grupo Racionais MC's, ícone do rap nacional.",
+        "artist",
+        None,
+        "Racionais MC's",
+        None,
+        None,
+    ),
+    (
+        "Q030",
+        "Marília Mendonça sertanejo feminejo",
+        "Usuário quer ouvir músicas da cantora sertaneja Marília Mendonça.",
+        "artist",
+        None,
+        "Marília Mendonça",
+        None,
+        None,
+    ),
+    (
+        "Q031",
+        "Chitãozinho e Xororó dupla sertaneja",
+        "Usuário quer músicas da dupla sertaneja clássica Chitãozinho & Xororó.",
+        "artist",
+        None,
+        "Chitãozinho & Xororó",
+        None,
+        None,
+    ),
+    (
+        "Q032",
+        "Tribalistas MPB",
+        "Usuário quer músicas do grupo Tribalistas, trio da MPB brasileira.",
+        "artist",
+        None,
+        "Tribalistas",
+        None,
+        None,
+    ),
+    (
+        "Q033",
+        "CPM 22 rock nacional",
+        "Usuário quer músicas da banda de rock CPM 22.",
+        "artist",
+        None,
+        "CPM 22",
+        None,
+        None,
+    ),
+    (
+        "Q034",
+        "Ferrugem pagode",
+        "Usuário quer músicas do cantor de pagode Ferrugem.",
+        "artist",
+        None,
+        "Ferrugem",
+        None,
+        None,
+    ),
+    (
+        "Q035",
+        "Calcinha Preta forró",
+        "Usuário quer músicas da banda de forró Calcinha Preta.",
+        "artist",
+        None,
+        "Calcinha Preta",
+        None,
+        None,
+    ),
+    (
+        "Q036",
+        "Isadora Pompeo gospel",
+        "Usuário quer músicas da cantora gospel Isadora Pompeo.",
+        "artist",
+        None,
+        "Isadora Pompeo",
+        None,
+        None,
+    ),
+    (
+        "Q037",
+        "Jorge e Mateus sertanejo",
+        "Usuário quer músicas da dupla sertaneja Jorge & Mateus.",
+        "artist",
+        None,
+        "Jorge & Mateus",
+        None,
+        None,
+    ),
     # ── GENRE (7) ─────────────────────────────────────────────────────────────
-    ("Q038", "forró",
-     "Usuário quer músicas do gênero forró, ritmo nordestino.",
-     "genre", None, None, "forro_arrocha", None),
-
-    ("Q039", "bossa nova MPB clássica",
-     "Usuário quer músicas de bossa nova e MPB tradicional brasileira.",
-     "genre", None, None, "mpb_bossa_choro", None),
-
-    ("Q040", "samba pagode",
-     "Usuário quer músicas do gênero samba e pagode brasileiro.",
-     "genre", None, None, "pagode_samba", None),
-
-    ("Q041", "funk carioca baile",
-     "Usuário quer músicas do funk carioca para baile.",
-     "genre", None, None, "funk", None),
-
-    ("Q042", "gospel louvor adoração",
-     "Usuário quer músicas gospel evangélicas de louvor e adoração.",
-     "genre", None, None, "gospel", None),
-
-    ("Q043", "rap nacional hip hop brasileiro",
-     "Usuário quer músicas de rap e hip hop produzidas no Brasil.",
-     "genre", None, None, "rap_trap", None),
-
-    ("Q044", "sertanejo universitário",
-     "Usuário quer músicas do sertanejo universitário contemporâneo.",
-     "genre", None, None, "sertanejo", None),
-
+    (
+        "Q038",
+        "forró",
+        "Usuário quer músicas do gênero forró, ritmo nordestino.",
+        "genre",
+        None,
+        None,
+        "forro_arrocha",
+        None,
+    ),
+    (
+        "Q039",
+        "bossa nova MPB clássica",
+        "Usuário quer músicas de bossa nova e MPB tradicional brasileira.",
+        "genre",
+        None,
+        None,
+        "mpb_bossa_choro",
+        None,
+    ),
+    (
+        "Q040",
+        "samba pagode",
+        "Usuário quer músicas do gênero samba e pagode brasileiro.",
+        "genre",
+        None,
+        None,
+        "pagode_samba",
+        None,
+    ),
+    (
+        "Q041",
+        "funk carioca baile",
+        "Usuário quer músicas do funk carioca para baile.",
+        "genre",
+        None,
+        None,
+        "funk",
+        None,
+    ),
+    (
+        "Q042",
+        "gospel louvor adoração",
+        "Usuário quer músicas gospel evangélicas de louvor e adoração.",
+        "genre",
+        None,
+        None,
+        "gospel",
+        None,
+    ),
+    (
+        "Q043",
+        "rap nacional hip hop brasileiro",
+        "Usuário quer músicas de rap e hip hop produzidas no Brasil.",
+        "genre",
+        None,
+        None,
+        "rap_trap",
+        None,
+    ),
+    (
+        "Q044",
+        "sertanejo universitário",
+        "Usuário quer músicas do sertanejo universitário contemporâneo.",
+        "genre",
+        None,
+        None,
+        "sertanejo",
+        None,
+    ),
     # ── ALBUM (6) ─────────────────────────────────────────────────────────────
-    ("Q045", "album Tribalistas",
-     "Usuário quer as músicas do álbum homônimo 'Tribalistas' do grupo Tribalistas.",
-     "album", None, "Tribalistas", None, "Tribalistas"),
-
-    ("Q046", "Nada Como um Dia Após o Outro Dia Racionais",
-     "Usuário quer as músicas do álbum duplo 'Nada Como um Dia Após o Outro Dia' dos Racionais MC's.",
-     "album", None, "Racionais MC's", None, "Nada Como um Dia Após o Outro Dia"),
-
-    ("Q047", "Escândalo Íntimo Luísa Sonza",
-     "Usuário quer as músicas do álbum 'Escândalo Íntimo' de Luísa Sonza.",
-     "album", None, "Luísa Sonza", None, "Escândalo Íntimo"),
-
-    ("Q048", "Caetano e Bethânia ao vivo album",
-     "Usuário quer as músicas do álbum ao vivo de Caetano Veloso e Maria Bethânia.",
-     "album", None, "Caetano Veloso", None, "Caetano e Bethânia Ao Vivo"),
-
-    ("Q049", "Acústico Engenheiros do Hawaii",
-     "Usuário quer as faixas do álbum acústico ao vivo dos Engenheiros do Hawaii.",
-     "album", None, "Engenheiros Do Hawaii", None, "Acústico (Ao Vivo / Deluxe)"),
-
-    ("Q050", "Grandes Sucessos Raça Negra pagode",
-     "Usuário quer o álbum de grandes sucessos do grupo de pagode Raça Negra.",
-     "album", None, "Raça Negra", None, "Grandes Sucessos"),
+    (
+        "Q045",
+        "album Tribalistas",
+        "Usuário quer as músicas do álbum homônimo 'Tribalistas' do grupo Tribalistas.",
+        "album",
+        None,
+        "Tribalistas",
+        None,
+        "Tribalistas",
+    ),
+    (
+        "Q046",
+        "Nada Como um Dia Após o Outro Dia Racionais",
+        "Usuário quer músicas do álbum duplo dos Racionais MC's.",
+        "album",
+        None,
+        "Racionais MC's",
+        None,
+        "Nada Como um Dia Após o Outro Dia",
+    ),
+    (
+        "Q047",
+        "Escândalo Íntimo Luísa Sonza",
+        "Usuário quer as músicas do álbum 'Escândalo Íntimo' de Luísa Sonza.",
+        "album",
+        None,
+        "Luísa Sonza",
+        None,
+        "Escândalo Íntimo",
+    ),
+    (
+        "Q048",
+        "Caetano e Bethânia ao vivo album",
+        "Usuário quer as músicas do álbum ao vivo de Caetano Veloso e Maria Bethânia.",
+        "album",
+        None,
+        "Caetano Veloso",
+        None,
+        "Caetano e Bethânia Ao Vivo",
+    ),
+    (
+        "Q049",
+        "Acústico Engenheiros do Hawaii",
+        "Usuário quer as faixas do álbum acústico ao vivo dos Engenheiros do Hawaii.",
+        "album",
+        None,
+        "Engenheiros Do Hawaii",
+        None,
+        "Acústico (Ao Vivo / Deluxe)",
+    ),
+    (
+        "Q050",
+        "Grandes Sucessos Raça Negra pagode",
+        "Usuário quer o álbum de grandes sucessos do grupo de pagode Raça Negra.",
+        "album",
+        None,
+        "Raça Negra",
+        None,
+        "Grandes Sucessos",
+    ),
 ]
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def normalize(text: str) -> str:
     """Lowercase + remove acentos + remove pontuação."""
@@ -294,12 +595,11 @@ def assign_grade(
       1 = Parcialmente relevante: relacionado mas não exato
       0 = Não relevante
     """
-    doc_id      = doc.get("id", "")
-    track_name  = doc.get("track_name", "") or ""
-    artist      = (doc.get("primary_artist_name") or doc.get("artist_names") or "")
-    genres      = doc.get("artist_genres", "") or ""
-    macro       = doc.get("macro_genre", "") or ""
-    album       = doc.get("album_name", "") or ""
+    doc_id = doc.get("id", "")
+    artist = doc.get("primary_artist_name") or doc.get("artist_names") or ""
+    genres = doc.get("artist_genres", "") or ""
+    macro = doc.get("macro_genre", "") or ""
+    album = doc.get("album_name", "") or ""
 
     if intent == "lyric":
         # grau 2: documento exato pela ID
@@ -314,9 +614,8 @@ def assign_grade(
         # grau 2: doc exato ou mesmo nome de track + artista
         if known_doc_id and doc_id == known_doc_id:
             return 2
-        if known_artist and known_doc_id is None:
-            if _contains(artist, known_artist):
-                return 1
+        if known_artist and known_doc_id is None and _contains(artist, known_artist):
+            return 1
         # grau 1: mesmo artista diferente track
         if known_artist and _contains(artist, known_artist):
             return 1
@@ -366,8 +665,10 @@ def assign_grade(
 
 # ── motor de busca ────────────────────────────────────────────────────────────
 
+
 def load_engine():
     from music_search.motors.search import load_or_build_default_engine
+
     print("Carregando motor de busca...", flush=True)
     engine = load_or_build_default_engine()
     print(f"  {engine.num_docs} documentos indexados.", flush=True)
@@ -379,12 +680,14 @@ def load_dense_engine():
     if not DENSE_INDEX_PATH.exists() or not DENSE_META_PATH.exists():
         print(
             f"  [AVISO] Índice FAISS não encontrado em {DENSE_INDEX_PATH}.\n"
-            "          Execute primeiro: uv run python -m music_search.scripts.build_dense_index\n"
+            "          Execute primeiro: uv run python -m "
+            "music_search.scripts.prepare_search_artifacts\n"
             "          O run file dense.txt será omitido do pool.",
             flush=True,
         )
         return None
     from music_search.motors.dense_search import DenseSearchEngine
+
     print("Carregando índice FAISS...", flush=True)
     engine = DenseSearchEngine.load(DENSE_INDEX_PATH, DENSE_META_PATH)
     print(f"  {engine.num_docs} documentos no índice denso.", flush=True)
@@ -411,6 +714,7 @@ def run_queries(engine, topics, algorithm: str, top_k: int = 20) -> dict[str, li
         intent = topic[3]
         # Para queries líricas, força boosts de letra
         from music_search.motors.tuning import SearchProfile
+
         profile: SearchProfile = "lyrics" if intent == "lyric" else "balanced"
         hits = engine.search(
             query,
@@ -429,7 +733,7 @@ def write_run_file(results: dict[str, list[dict]], path: Path, system_name: str)
         for qid, hits in results.items():
             for rank, h in enumerate(hits, 1):
                 doc_id = h.get("id", "")
-                score  = h.get("score", 0.0)
+                score = h.get("score", 0.0)
                 f.write(f"{qid}\tQ0\t{doc_id}\t{rank}\t{score:.6f}\t{system_name}\n")
 
 
@@ -460,7 +764,14 @@ def write_qrels(pool: dict[str, dict[str, dict]], topics: list, path: Path) -> d
             has_relevant = False
             for doc_id, hit in sorted(docs.items()):
                 doc_data = hit.get("data_completa") or hit
-                grade = assign_grade(doc_data, intent, known_doc_id, known_artist, known_genre, known_album)
+                grade = assign_grade(
+                    doc_data,
+                    intent,
+                    known_doc_id,
+                    known_artist,
+                    known_genre,
+                    known_album,
+                )
                 f.write(f"{qid}\t0\t{doc_id}\t{grade}\n")
                 stats["total"] += 1
                 stats[f"grade{grade}"] += 1
@@ -533,17 +844,18 @@ CONVERSÃO PARA BINÁRIO (MRR, MAP, P@10, Bpref)
 
 
 def write_resumo(stats: dict, n_topics: int, n_systems: int, path: Path) -> None:
+    dense_status = " (gerado)" if n_systems == 4 else " (AUSENTE — índice FAISS não encontrado)"
     text = f"""\
 RESUMO DA COLEÇÃO DE REFERÊNCIA
 ================================
 Consultas (topics)     : {n_topics}
 Sistemas no pool       : {n_systems}
-Total de pares julgados: {stats['total']}
-  Grau 2 (altamente)  : {stats['grade2']}
-  Grau 1 (parcial)    : {stats['grade1']}
-  Grau 0 (irrelevante): {stats['grade0']}
-Queries com >= 1 doc rel.: {stats['queries_com_relevante']} / {n_topics}
-Média docs por query   : {stats['total'] / n_topics:.1f}
+Total de pares julgados: {stats["total"]}
+  Grau 2 (altamente)  : {stats["grade2"]}
+  Grau 1 (parcial)    : {stats["grade1"]}
+  Grau 0 (irrelevante): {stats["grade0"]}
+Queries com >= 1 doc rel.: {stats["queries_com_relevante"]} / {n_topics}
+Média docs por query   : {stats["total"] / n_topics:.1f}
 
 DISTRIBUIÇÃO DE INTENTS
   lyric  : 15 consultas (Q001-Q015)
@@ -555,17 +867,18 @@ DISTRIBUIÇÃO DE INTENTS
 ARQUIVOS GERADOS
   topics.tsv           → {n_topics} consultas (ID, texto, descrição, intent)
   protocolo.txt        → critérios de relevância
-  qrels.tsv            → {stats['total']} julgamentos no formato TREC
+  qrels.tsv            → {stats["total"]} julgamentos no formato TREC
   runs/bm25.txt        → run file BM25
   runs/tfidf.txt       → run file TF-IDF
   runs/lyric.txt       → run file busca lírica
-  runs/dense.txt       → run file busca vetorial densa{' (gerado)' if n_systems == 4 else ' (AUSENTE — índice FAISS não encontrado)'}
+  runs/dense.txt       → run file busca vetorial densa{dense_status}
 """
     path.write_text(text, encoding="utf-8")
     print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
+
 
 def main():
     print("=" * 60)

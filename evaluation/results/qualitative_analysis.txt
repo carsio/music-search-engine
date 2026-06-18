@@ -1,15 +1,15 @@
 ANÁLISE QUALITATIVA — nDCG@10 por Query e Sistema
 ======================================================================
-Data     : 2026-06-16 22:59
+Data     : 2026-06-17 21:54
 Métrica  : nDCG@10 | Sistemas: BM25, TF-IDF, Dense
 
-1. QUERIES DIFÍCEIS PARA TODOS OS SISTEMAS (média nDCG@10 < 0.10)
+1. QUERIES DIFÍCEIS PARA TODOS OS SYSTEMS (média nDCG@10 < 0.10)
    QID     Intent          BM25      TF-IDF       Dense  Query
    -----------------------------------------------------------------
    Q011    lyric         0.0000      0.0000      0.0000  amor o meu coração pede só pra te amar f
    Q033    artist        0.0000      0.0000      0.0000  CPM 22 rock nacional
-   Q050    album         0.0000      0.0000      0.0000  Grandes Sucessos Raça Negra pagode
    Q046    album         0.0000      0.0000      0.0000  Nada Como um Dia Após o Outro Dia Racion
+   Q050    album         0.0000      0.0000      0.0000  Grandes Sucessos Raça Negra pagode
    Q028    artist        0.0000      0.0000      0.0734  Djavan
    Q027    track         0.0000      0.0000      0.1086  Insônia Tribo da Periferia rap
    Q034    artist        0.0784      0.0851      0.0000  Ferrugem pagode
@@ -17,7 +17,7 @@ Métrica  : nDCG@10 | Sistemas: BM25, TF-IDF, Dense
    Q036    artist        0.0000      0.0000      0.2344  Isadora Pompeo gospel
    Q030    artist        0.2025      0.0784      0.0000  Marília Mendonça sertanejo feminejo
 
-2. TOP-10 QUERIES COM MAIOR DIVERGÊNCIA ENTRE SISTEMAS
+2. TOP-10 QUERIES COM MAIOR DIVERGÊNCIA ENTRE SYSTEMS
    QID     Intent          BM25      TF-IDF       Dense    Diff  Melhor          Query
    -----------------------------------------------------------------
    Q006    lyric         1.0000      1.0000      0.0000   1.000  BM25            me encontra que espero a tanto temp
@@ -63,20 +63,20 @@ Métrica  : nDCG@10 | Sistemas: BM25, TF-IDF, Dense
    Q004    lyric         0.6045      0.5864      0.0000   0.3970  ela quer rolar na minha silverado c
    Q005    lyric         0.6309      0.4307      0.3333   0.4650  depois de tantos planos de um futur
    Q006    lyric         1.0000      1.0000      0.0000   0.6667  me encontra que espero a tanto temp
-   Q007    lyric         0.7003      0.4984      0.0000   0.3996  um minuto para o fim do mundo punk 
+   Q007    lyric         0.7003      0.4984      0.0000   0.3996  um minuto para o fim do mundo punk
    Q008    lyric         0.8597      0.8597      0.1637   0.6277  louca por ti amor demais na praia n
    Q009    lyric         1.0000      0.6309      0.0000   0.5436  há um vento fresco algo maravilhoso
    Q010    lyric         0.2520      0.1138      0.0000   0.1219  coração partido não me acostumei di
    Q011    lyric         0.0000      0.0000      0.0000   0.0000  amor o meu coração pede só pra te a
    Q012    lyric         1.0000      1.0000      0.0000   0.6667  cedo ou tarde vamos nos encontrar r
-   Q013    lyric         1.0000      1.0000      0.7075   0.9025  poderosa olhar de diamante agita o 
+   Q013    lyric         1.0000      1.0000      0.7075   0.9025  poderosa olhar de diamante agita o
    Q014    lyric         0.6509      0.2398      0.0000   0.2969  vai e vem não sai de órbita eita vi
    Q015    lyric         1.0000      0.3733      0.0000   0.4578  mesmo que eu vá correndo sem direçã
    Q016    track         0.3608      0.4672      0.0000   0.2760  Anna Júlia Los Hermanos
    Q017    track         0.4266      0.4245      0.4080   0.4197  Velha Infância Tribalistas
    Q018    track         0.2373      0.1804      0.0902   0.1693  Vida Loka Racionais MC's
    Q019    track         0.1828      0.2075      0.1554   0.1819  Dormi Na Praça Chitãozinho Xororó
-   Q020    track         0.2581      0.2405      0.1804   0.2263  Obrigado por Estragar Tudo Marília 
+   Q020    track         0.2581      0.2405      0.1804   0.2263  Obrigado por Estragar Tudo Marília
    Q021    track         0.8190      0.7610      0.5287   0.7029  Me Ama Ou Me Larga Simone Mendes
    Q022    track         0.4982      0.4793      0.0000   0.3258  Apaguei Pra Todos Ferrugem
    Q023    track         0.2942      0.2942      0.0000   0.1961  Dias Atrás CPM 22

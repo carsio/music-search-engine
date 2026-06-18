@@ -91,7 +91,7 @@ class DenseSearchEngine:
         k = min(top_k, self.num_docs)
         scores, indices = self.index.search(vec.astype("float32"), k)
         hits: list[DenseHit] = []
-        for rank, (idx, score) in enumerate(zip(indices[0], scores[0]), start=1):
+        for rank, (idx, score) in enumerate(zip(indices[0], scores[0], strict=True), start=1):
             if idx < 0:
                 continue
             doc_id = self.doc_ids[int(idx)]
