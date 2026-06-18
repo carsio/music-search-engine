@@ -1,17 +1,23 @@
-# Relatório técnico — ICC222
+# Relatório técnico — Recuperação da Informação
 
-Artigo (template SBC) do trabalho da disciplina **ICC222 — Tópicos em
-Recuperação de Informação** (UFAM 2026/1), descrevendo o *Music Search Engine*.
+Artigo (template SBC) do trabalho da disciplina **Recuperação da Informação**
+(UFAM 2026/1), descrevendo o *Music Search Engine* — desenvolvimento e avaliação
+experimental de um sistema de RI multi-campo e híbrido para músicas brasileiras.
 
 ## Arquivos
 
 | Arquivo | Função |
 | --- | --- |
-| `main.tex` | o artigo (LaTeX, ~10 páginas) |
+| `main.tex` | o artigo (LaTeX) |
 | `sbc-template.sty` | folha de estilo SBC vendorizada (auto-contida, compila offline) |
 | `refs.bib` | referências bibliográficas |
-| `benchmark.py` | script reproduzível que gera os números da seção de Resultados |
-| `results.md` | saída do benchmark (rastreabilidade dos números citados no `.tex`) |
+| `figures/` | figuras dos resultados (heatmap, barras por intent, boxplot, scatter) |
+| `benchmark.py` | script auxiliar de *benchmark* de **performance** (latência/vocabulário) — não é mais citado no relatório |
+| `results.md` | saída do `benchmark.py` (apenas performance) |
+
+Os números da seção de Resultados vêm da **coleção de referência** estilo TREC
+(50 consultas, 1.604 julgamentos *silver standard*) descrita no próprio artigo —
+o pipeline de avaliação de relevância é externo a este diretório.
 
 ## Compilar localmente
 
@@ -28,8 +34,13 @@ tectonic main.tex
 ```
 
 O PDF (`main.pdf`) não é versionado — o artefato canônico é produzido pela
-pipeline `.github/workflows/report.yml` e fica disponível como *artifact* em
-cada execução do GitHub Actions.
+pipeline `.github/workflows/report.yml`. Em cada push para `master`, a pipeline
+publica o PDF num **release de tag móvel** `report-latest`, de modo que o link no
+README do projeto aponta sempre para a última versão gerada:
+
+<https://github.com/carsio/music-search-engine/releases/download/report-latest/main.pdf>
+
+Em PRs e outras branches o PDF fica disponível como *artifact* da execução.
 
 ## Regenerar os números do benchmark
 

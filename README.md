@@ -6,6 +6,8 @@ Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFA
 
 📊 Slides: <https://carsio.github.io/music-search-engine/>
 
+📄 Relatório técnico (PDF, última versão): **[main.pdf](https://github.com/carsio/music-search-engine/releases/download/report-latest/main.pdf)** — gerado automaticamente a cada build a partir de [`docs/report/`](docs/report).
+
 > 📖 Para entender o sistema do começo ao fim — conceitos de RI, pipeline de
 > dados, BM25/TF-IDF (com fórmulas), motores, classificação de intent e o
 > trajeto de uma query — comece por **[`docs/GUIA.md`](docs/GUIA.md)**. Este

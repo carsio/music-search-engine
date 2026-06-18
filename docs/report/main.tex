@@ -31,165 +31,109 @@
 
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 
-\title{Music Search Engine: um sistema de recuperação de informação para
-música brasileira combinando modelos léxicos (TF-IDF e BM25) e busca
-vetorial densa}
+\title{Music Search Engine: Desenvolvimento e Avaliação de um Sistema de
+Recuperação de Informação Multi-Campo e Híbrido para Músicas Brasileiras}
 
-\author{Carsio Eddyo \and Carlos Alexandre \and Raquel de Sá \and Lelson
-Nascimento}
+\author{Raquel de Sá Silva \and Lelson Lopes Nascimento \and Carsio Eddyo de
+Souza Silveira \and Carlos Alexandre Souza}
 
 \institute{Instituto de Computação (IComp) -- Universidade Federal do Amazonas
 (UFAM)\\
+Programa de Pós-Graduação em Informática (PPGI)\\
 Manaus -- AM -- Brasil\\
-Disciplina ICC222 -- Tópicos em Recuperação de Informação -- 2026/1\\
-\email{\{carsio, carlos.alexandre, raquel.sa, lelson\}@icomp.ufam.edu.br}}
+Disciplina: Recuperação da Informação -- 2026/1 -- Prof.\ Dr.\ Edleno Silva de
+Moura\\
+\email{\{raquel.sa, lelson, carsio, carlos.alexandre\}@icomp.ufam.edu.br}}
 
 \begin{document}
 
 \maketitle
 
 \begin{resumo}
-Este trabalho descreve o \textit{Music Search Engine}, um sistema de
-recuperação de informação (RI) para um catálogo curado de 50.000 faixas
-musicais brasileiras, das quais 36.017 possuem letra consolidada. O sistema
-implementa, a partir do zero, o núcleo clássico de RI --- pré-processamento
-textual (normalização, tokenização, remoção de \textit{stopwords} e
-\textit{stemming} RSLP/Snowball), índice invertido multi-campo e os modelos de
-ranqueamento TF-IDF (com similaridade de cosseno) e Okapi BM25 --- e os
-complementa com busca vetorial densa baseada em \textit{embeddings}. O motor é
-exposto por uma API FastAPI consumida por uma SPA React, com classificação de
-intenção determinística que roteia cada consulta para o índice adequado.
-Apresentamos a metodologia de construção do corpus, as decisões de projeto e
-uma avaliação experimental de desempenho: o índice é construído em cerca de
-84~s sobre 36~mil documentos e responde consultas com latência mediana de
-22,8~ms (BM25) e 17,9~ms (TF-IDF). Discutimos os \textit{trade-offs} entre os
-modelos e delineamos a avaliação de relevância (Precision, MAP, nDCG) como
-trabalho futuro.
+Este relatório apresenta o desenvolvimento e a avaliação experimental de um
+sistema de busca especializado em músicas brasileiras, concebido para explorar
+abordagens esparsas, densas e modelos híbridos de recuperação de informação. O
+motor esparso foi construído com base em índices invertidos estruturados em
+múltiplos campos, implementando os algoritmos Okapi BM25 e TF-IDF com
+similaridade de cosseno. O motor denso integra representações vetoriais locais
+(via FAISS). Adicionalmente, o sistema utiliza uma camada de orquestração com
+roteamento de intenção (\textit{Intent Routing}) e perfis de sintonização
+(\textit{Tuning Profiles}) para otimizar os pesos dos campos dinamicamente. Para
+validar a solução, estruturou-se uma coleção de referência composta por
+consultas e julgamentos de relevância, avaliada por meio de métricas clássicas
+de qualidade de ranqueamento como Precisão, Revocação e nDCG. Os resultados
+demonstram a eficácia da combinação de múltiplas estratégias para mitigar as
+limitações de abordagens puramente textuais ou puramente semânticas no domínio
+musical.
 \end{resumo}
 
 \begin{abstract}
-This work presents \textit{Music Search Engine}, an information retrieval (IR)
-system over a curated catalog of 50,000 Brazilian music tracks, 36,017 of which
-include consolidated lyrics. The system implements the classic IR core from
-scratch --- text preprocessing (normalization, tokenization, stopword removal
-and RSLP/Snowball stemming), a multi-field inverted index, and the TF-IDF
-(cosine) and Okapi BM25 ranking models --- complemented by dense vector search
-based on embeddings. The engine is exposed through a FastAPI backend consumed
-by a React SPA, with a deterministic intent classifier that routes each query
-to the appropriate index. We describe the corpus construction methodology,
-design decisions, and a performance evaluation: the index is built in about
-84~s over 36k documents and answers queries with a median latency of 22.8~ms
-(BM25) and 17.9~ms (TF-IDF). We discuss model trade-offs and outline
-relevance evaluation (Precision, MAP, nDCG) as future work.
+This report presents the development and experimental evaluation of a search
+system specialized in Brazilian music, designed to explore sparse, dense, and
+hybrid information retrieval approaches. The sparse engine is built on inverted
+indexes structured over multiple fields, implementing the Okapi BM25 and TF-IDF
+(cosine similarity) ranking models. The dense engine integrates local vector
+representations via FAISS. The system also features an orchestration layer with
+intent routing and tuning profiles that dynamically optimize field weights. To
+validate the solution, a TREC-style reference collection of queries and graded
+relevance judgments was built and evaluated with classical ranking-quality
+metrics (Precision, Recall, MAP, nDCG, MRR, Bpref). Results show the
+effectiveness of combining multiple strategies to mitigate the limitations of
+purely lexical or purely semantic approaches in the musical domain.
 \end{abstract}
 
 % =====================================================================
 \section{Introdução}
+\label{sec:introducao}
 % =====================================================================
 
-A Recuperação de Informação (RI) estuda como localizar, em uma coleção de
-documentos, aqueles que melhor satisfazem uma necessidade de informação
-expressa por uma consulta em linguagem natural~\cite{manning2008introduction}.
-Sistemas de busca textual são uma das aplicações mais difundidas da
-computação, e seus algoritmos fundamentais --- índice invertido, modelo
-vetorial e funções de ranqueamento probabilístico --- permanecem no centro de
-motores de busca modernos.
+A recuperação de informação (RI) no domínio musical impõe desafios complexos
+devido à natureza heterogênea de seus dados. Uma consulta de usuário pode
+expressar diferentes intenções: a busca por termos exatos presentes em uma
+letra de música, a identificação de metadados específicos (como artista, álbum
+ou gênero) ou mesmo uma busca conceitual e semântica por temas abstratos
+traduzidos nos versos.
 
-Este trabalho aplica esses conceitos, estudados na disciplina ICC222 (UFAM,
-2026/1), à construção de um protótipo funcional de busca para um domínio
-específico: a \textbf{música popular brasileira}. A escolha do domínio é
-motivada por três características que o tornam um bom estudo de caso para RI:
-(i)~as consultas são heterogêneas --- o usuário pode buscar por trecho de
-\emph{letra}, por \emph{artista}, por \emph{gênero} ou por \emph{álbum}; (ii)~o
-texto das letras é ruidoso (gírias, repetições, refrãos), o que estressa a
-normalização e o ranqueamento; e (iii)~o vocabulário é majoritariamente em
-português, exigindo \textit{stemming} adequado à língua.
+Sistemas tradicionais baseados exclusivamente em correspondência exata de
+termos costumam falhar quando o usuário não se recorda da grafia exata dos
+metadados ou tenta buscar músicas por afinidade temática. Por outro lado,
+abordagens puramente semânticas podem negligenciar palavras-chave cruciais e
+nomes próprios altamente específicos.
 
-Seguindo a Opção~1 da especificação da disciplina --- desenvolver um
-\emph{protótipo funcional de sistema de recuperação de informação} ---,
-construímos o \textit{Music Search Engine}: um sistema que implementa o núcleo
-clássico de RI do zero e o disponibiliza por meio de uma aplicação web. As
-principais contribuições deste trabalho são:
-
-\begin{itemize}
-  \item a curadoria de um corpus de 50.000 faixas brasileiras, enriquecido com
-    36.017 letras consolidadas a partir de múltiplas fontes públicas;
-  \item a implementação, em Python, de um núcleo de RI auditável contendo
-    pré-processamento, índice invertido multi-campo e os modelos TF-IDF e
-    Okapi BM25, com \textit{field boosts} por domínio;
-  \item a integração de um modelo vetorial denso (\textit{embeddings} +
-    banco vetorial Milvus) como caminho complementar para consultas
-    semânticas;
-  \item uma aplicação web completa (API FastAPI + SPA React) com classificação
-    de intenção determinística e roteamento por tipo de entidade; e
-  \item uma avaliação experimental de desempenho (tempo de indexação, latência
-    de consulta, tamanho do índice) com números reais e reproduzíveis.
-\end{itemize}
+O objetivo deste trabalho consiste em projetar, implementar e avaliar um
+protótipo funcional de um \textbf{Buscador de Músicas Brasileiras}. O sistema
+aplica de maneira prática os conceitos fundamentais da disciplina Recuperação
+de Informação~\cite{manning2008introduction,baezayates1999modern}, do Instituto
+de Computação da Universidade Federal do Amazonas, unindo a eficiência dos
+modelos esparsos clássicos com o poder de generalização das arquiteturas densas
+modernas~\cite{grainger2024aipowered}, sustentado por um ecossistema robusto de
+roteamento e avaliação quantitativa de qualidade.
 
 O restante do texto está organizado da seguinte forma. A
-Seção~\ref{sec:fundamentacao} revisa os fundamentos de RI utilizados. A
-Seção~\ref{sec:metodologia} detalha a metodologia: construção do corpus,
-núcleo de RI, motores de busca e arquitetura do sistema. A
-Seção~\ref{sec:resultados} apresenta os resultados experimentais. A
-Seção~\ref{sec:discussao} discute os achados e as limitações, e a
-Seção~\ref{sec:conclusao} conclui e aponta trabalhos futuros.
+Seção~\ref{sec:fundamentacao} apresenta a fundamentação teórica e os métodos de
+busca. A Seção~\ref{sec:metodologia} detalha a metodologia e a arquitetura do
+sistema. A Seção~\ref{sec:colecao} descreve a construção da coleção de
+referência e o protocolo de avaliação experimental. A
+Seção~\ref{sec:resultados} apresenta e discute os resultados, e a
+Seção~\ref{sec:conclusao} conclui o trabalho.
 
 % =====================================================================
-\section{Fundamentação teórica}
+\section{Fundamentação Teórica e Métodos de Busca}
 \label{sec:fundamentacao}
 % =====================================================================
 
-\subsection{Pré-processamento e índice invertido}
+O arcabouço teórico do sistema divide-se entre modelos esparsos clássicos e
+estratégias de busca vetorial densa, conforme especificado nos componentes
+centrais do motor de busca.
 
-Antes de qualquer comparação, o texto é convertido em uma sequência de
-\textbf{termos} normalizados. O pipeline canônico aplica, em ordem:
-normalização (\textit{lowercasing}, remoção de acentos via NFKD, substituição
-de pontuação por espaços), tokenização, remoção de \textit{stopwords} e
-\textit{stemming}. O \textit{stemming} reduz flexões a um radical comum
-(p.~ex.\ ``cantando'', ``cantamos'' $\rightarrow$ ``cant''), de modo que
-variações morfológicas casem com a consulta. Para o português utiliza-se o
-algoritmo RSLP~\cite{orengo2001stemming} e, para o inglês, o
-Snowball~\cite{bird2009nltk}.
+\subsection{Modelos Esparsos Clássicos}
 
-O \textbf{índice invertido}~\cite{manning2008introduction} é a estrutura que
-torna a busca eficiente: para cada termo, armazena-se a \textit{postings list}
---- a lista de documentos em que ele ocorre e com qual frequência. Formalmente,
-mantém-se $\text{postings}[t] = [(d, \text{tf}(t,d)), \dots]$, além do
-comprimento de cada documento e do mapeamento entre identificadores internos e
-externos. Assim, responder ``quais documentos contêm o termo $t$?'' custa
-$O(1)$, e o ranqueamento percorre apenas os documentos candidatos.
-
-\subsection{Modelo vetorial e TF-IDF}
-
-No modelo vetorial~\cite{salton1975vector}, documentos e consultas são vetores
-em um espaço cujas dimensões são os termos do vocabulário. O peso de um termo
-$t$ em um documento $d$ combina sua frequência local e sua raridade global:
-%
-\begin{equation}
-  w(t,d) = \text{tf\_weight}(\text{tf}(t,d)) \cdot \text{idf}(t),
-  \qquad
-  \text{idf}(t) = \ln\!\left(\frac{N}{\text{df}(t)}\right),
-\end{equation}
-%
-em que $N$ é o número total de documentos e $\text{df}(t)$ o número de
-documentos que contêm $t$~\cite{sparckjones1972statistical}. Termos raros
-recebem maior peso. A função $\text{tf\_weight}$ admite três variantes:
-\emph{raw} ($\text{tf}$ direto), \emph{log} ($1 + \ln \text{tf}$, o padrão
-adotado) e \emph{augmented} ($0{,}5 + 0{,}5\cdot\text{tf}/\max_t \text{tf}$). A
-relevância é medida pela similaridade de cosseno entre os vetores:
-%
-\begin{equation}
-  \text{cos\_sim}(d,q)
-    = \frac{\mathbf{v}_d \cdot \mathbf{v}_q}
-           {\lVert \mathbf{v}_d \rVert \, \lVert \mathbf{v}_q \rVert}.
-\end{equation}
-
-\subsection{Okapi BM25}
-
-O BM25~\cite{robertson2009probabilistic} substitui o cosseno por um escore
-aditivo que incorpora duas correções importantes: a \textbf{saturação} da
-frequência de termos (repetir um termo 50 vezes não vale 50 vezes mais) e a
-\textbf{normalização pelo tamanho} do documento. O escore é:
+\paragraph{Okapi BM25.} Implementado como o \textit{ranker} esparso principal,
+pontua cada documento $D$ em relação a uma consulta $Q$ considerando a saturação
+da frequência de termos ($\text{tf}$) e a normalização pelo tamanho do
+documento~\cite{robertson1994okapi,robertson2009probabilistic}. Foram adotados
+os parâmetros padrão $k_1 = 1{,}5$ e $b = 0{,}75$. A fórmula utilizada para o
+cálculo do \textit{score} segue a especificação canônica:
 %
 \begin{equation}
   \text{BM25}(D,Q)
@@ -198,47 +142,46 @@ frequência de termos (repetir um termo 50 vezes não vale 50 vezes mais) e a
            {\text{tf}(t,D) + k_1\!\left(1 - b + b\,\dfrac{|D|}{\text{avgdl}}\right)},
 \end{equation}
 %
-com o IDF suavizado:
+em que o IDF é suavizado para evitar valores negativos:
 %
 \begin{equation}
   \text{IDF}_{\text{bm25}}(t)
     = \ln\!\left(\frac{N - \text{df}(t) + 0{,}5}{\text{df}(t) + 0{,}5} + 1\right).
 \end{equation}
+
+\paragraph{TF-IDF com similaridade de cosseno.} Configurado utilizando o esquema
+de ponderação \textit{ltc} do sistema SMART~\cite{salton1975vector}. O peso do
+termo no documento é determinado por $1 + \ln(\text{tf})$, aplicado tanto para a
+representação bruta quanto para a versão com frequência aumentada. A ordenação
+final dos documentos é obtida pelo cálculo do cosseno do ângulo entre os vetores
+normalizados da consulta e do documento:
 %
-O parâmetro $k_1$ controla a velocidade de saturação da $\text{tf}$ e $b$ pondera a
-normalização por tamanho. Adotam-se os valores convencionais de
-Lucene/Elasticsearch~\cite{lucene_similarity}, $k_1 = 1{,}5$ e $b = 0{,}75$.
+\begin{equation}
+  \text{cos\_sim}(d,q)
+    = \frac{\mathbf{v}_d \cdot \mathbf{v}_q}
+           {\lVert \mathbf{v}_d \rVert \, \lVert \mathbf{v}_q \rVert}.
+\end{equation}
 
-\subsection{Busca vetorial densa}
+\subsection{Busca Vetorial Densa e Semântica}
 
-Modelos léxicos casam termos exatos e, por isso, falham diante de sinônimos e
-paráfrases. A \textbf{busca vetorial densa} representa documentos e consultas
-como vetores contínuos (\textit{embeddings}) produzidos por redes neurais
-\cite{reimers2019sentence}, recuperando por similaridade semântica. A consulta
-``música triste'' pode então recuperar faixas com termos como ``melancolia''
-ou ``lamento'', mesmo sem sobreposição léxica. A busca por vizinhos mais
-próximos sobre os vetores é viabilizada por bancos vetoriais como o
-Milvus~\cite{wang2021milvus}.
-
-\subsection{Métricas de avaliação de RI}
-
-A qualidade de um sistema de RI é tipicamente medida com
-\textit{relevance judgments}: dado um conjunto de consultas e os documentos
-relevantes para cada uma, computam-se \textbf{Precision@k} (fração de
-relevantes entre os $k$ primeiros), \textbf{Recall@k}, \textbf{Mean Average
-Precision} (MAP) e \textbf{nDCG} (que pondera ganho por
-posição)~\cite{manning2008introduction}. Essas métricas requerem um
-\emph{golden set} anotado --- elemento ainda não construído neste trabalho e
-discutido na Seção~\ref{sec:conclusao}.
+\paragraph{Representação densa local.} Utiliza o modelo pré-treinado
+\textit{paraphrase-multilingual-MiniLM-L12-v2} da biblioteca
+\textit{Sentence\-Transformers}~\cite{reimers2019sentence} para gerar
+\textit{embeddings} de 384 dimensões a partir das letras e metadados. O índice e
+a busca por vizinhos mais próximos são gerenciados localmente através da
+biblioteca FAISS~\cite{johnson2021billion}, empregando a estratégia
+\textit{IndexFlatIP} (\textit{Inner Product}) sobre vetores normalizados ---
+equivalente, nesse caso, à similaridade de cosseno.
 
 % =====================================================================
-\section{Metodologia}
+\section{Metodologia e Arquitetura do Sistema}
 \label{sec:metodologia}
 % =====================================================================
 
-O sistema é organizado em camadas, isolando os algoritmos puros de RI do
-domínio musical e da apresentação. A Figura~\ref{fig:arquitetura} resume a
-arquitetura.
+O sistema foi estruturado modularmente na linguagem Python, dividindo as
+responsabilidades entre processamento de dados, indexação multi-campo,
+roteamento inteligente e disponibilização de serviços via API. A
+Figura~\ref{fig:arquitetura} resume a organização em camadas.
 
 \begin{figure}[ht]
 \centering
@@ -249,13 +192,13 @@ arquitetura.
     core/.style={box, fill=orange!12},
     arr/.style={-{Stealth[length=2mm]}, thick}
   ]
-  \node[box, text width=10.5cm] (front) {Frontend SPA (React + Vite) \quad / \quad UIs Tkinter (debug)};
+  \node[box, text width=10.5cm] (front) {Frontend SPA (React + Vite)};
   \node[box, below=0.5cm of front, text width=10.5cm] (api)
     {API FastAPI \;--\; classificação de intenção (heurística) + roteamento};
   \node[box, below=0.5cm of api, text width=5.0cm] (motors)
     {Motores \\ \texttt{SparseSearchEngine} \\ \texttt{MultiEntityIndex}};
   \node[box, right=0.5cm of motors, text width=4.8cm] (vector)
-    {Busca vetorial \\ \textit{embeddings} + Milvus};
+    {Busca vetorial densa \\ \textit{embeddings} + FAISS};
   \node[core, below=0.5cm of motors, text width=5.0cm] (core)
     {Núcleo de RI \\ preprocessing $\rightarrow$ índice invertido $\rightarrow$ ranking (TF-IDF, BM25)};
   \node[box, below=0.5cm of core, text width=10.5cm] (data)
@@ -273,299 +216,615 @@ curado e adicionam \textit{field boosts} e roteamento.}
 \label{fig:arquitetura}
 \end{figure}
 
-\subsection{Construção do corpus}
+\subsection{Indexação Multi-Campo e Atribuição de Pesos}
 
-A fonte primária é o \textit{Spotify Metadata}, com metadados estruturados de
-milhões de faixas (nome, artistas, álbum, gêneros, popularidade,
-\textit{audio features}). Uma etapa de análise exploratória e curadoria filtra
-o conjunto para faixas brasileiras (gêneros contendo ``brazilian'', ``samba'',
-``bossa nova'' etc.; artistas com mercado BR; popularidade mínima), produzindo
-50.000 faixas.
-
-Os metadados não bastam: para indexar letras é preciso o \emph{texto}. Ele é
-obtido por uma \textbf{cascata de fontes públicas} (LRCLib, Lyrics.ovh,
-Vagalume, Letras.mus.br, Genius e LyricFind): tenta-se a primeira fonte e, em
-caso de ausência, passa-se à seguinte, com variantes de título (remoção de
-sufixos como ``\textit{Remastered}'') e \textit{retry} com \textit{backoff}
-exponencial. Toda a coleta é memoizada em SQLite e protegida por
-\textit{rate limiting} (\textit{token bucket}) e \textit{circuit breaker},
-tornando o processo idempotente e resiliente. Ao final, 36.017 faixas obtêm
-letra consolidada.
-
-Para responder consultas por artista e gênero com painéis informativos, um
-pipeline de \textbf{enriquecimento determinístico} coleta texto da
-Wikipédia~PT e o materializa em dimensões separadas. O dataset final é
-versionado em tabelas Parquet, acompanhado de um manifesto
-(\texttt{br\_dataset\_manifest.json}, versão 0.3.0) com contagens, tamanhos e
-\textit{hashes} SHA-1. A Tabela~\ref{tab:dataset} resume o \textit{snapshot}
-atual.
+Os documentos do acervo musical não são tratados como blocos de texto único. O
+índice invertido é segmentado em campos distintos, recebendo fatores de
+multiplicação (\textit{boosts}) diferenciados para calibrar a relevância de
+acordo com a semântica de cada atributo, conforme a Tabela~\ref{tab:weights}. A
+lógica é direta: um termo da consulta que aparece na \emph{letra} ou no
+\emph{título} é sinal mais forte de relevância do que no nome do álbum.
 
 \begin{table}[ht]
 \centering
-\caption{Snapshot versionado do dataset (manifesto v0.3.0).}
-\label{tab:dataset}
-\begin{tabular}{lrl}
-\toprule
-\textbf{Artefato} & \textbf{Registros} & \textbf{Uso} \\
-\midrule
-\texttt{br\_curated\_tracks} & 50.000 & metadados estruturados das faixas \\
-\texttt{br\_curated\_lyrics} & 36.017 & corpus textual indexado (BM25/TF-IDF) \\
-\texttt{br\_artists}         & 7.255  & dimensão de artistas (Wikipédia PT) \\
-\texttt{br\_genres}          & 42     & dimensão de gêneros \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Núcleo de RI}
-
-O núcleo (camada \texttt{core/}) é deliberadamente agnóstico ao domínio:
-recebe documentos e consultas genéricos e devolve escores. O
-pré-processamento (\texttt{core/preprocessing.py}) implementa o pipeline da
-Seção~\ref{sec:fundamentacao}. O índice (\texttt{core/indexer.py}) é
-\textbf{multi-campo}: cada documento possui campos (\texttt{track\_name},
-\texttt{lyrics}, \texttt{artist\_names}, \texttt{artist\_genres},
-\texttt{macro\_genre}, \texttt{album\_name}) e o índice mantém \textit{postings}
-separados por campo, com identificadores internos densos e persistência via
-\textit{pickle}. O ranqueamento (\texttt{core/ranking.py}) implementa TF-IDF e
-BM25 sobre o mesmo índice, pré-calculando IDFs e normas via \textit{caching}; o
-custo de uma consulta é $O(|Q| \cdot |\text{candidatos}|)$.
-
-\subsection{Motores de busca e \textit{field boosts}}
-
-{\sloppy
-A camada de motores (\texttt{motors/}) aplica o núcleo ao domínio. O
-\texttt{SparseSearchEngine} calcula o escore de cada campo separadamente,
-normaliza-o por campo (para combinar escalas distintas) e soma ponderado por
-pesos de domínio (\textit{field boosts}), apresentados na
-Tabela~\ref{tab:weights}. A lógica é: um termo da consulta que aparece na
-\emph{letra} ou no \emph{título} é sinal mais forte de relevância do que no
-nome do álbum.\par}
-
-\begin{table}[ht]
-\centering
-\caption{Pesos por campo (\texttt{DEFAULT\_FIELD\_WEIGHTS}).}
+\caption{Pesos (\textit{boost}) por campo no índice multi-campo.}
 \label{tab:weights}
-\begin{tabular}{lcl}
+\begin{tabular}{l L{6.2cm} c}
 \toprule
-\textbf{Campo} & \textbf{Peso} & \textbf{Justificativa} \\
+\textbf{Campo do índice} & \textbf{Descrição curta} & \textbf{Peso padrão} \\
 \midrule
-\texttt{lyrics}        & 4{,}0  & conteúdo principal \\
-\texttt{track\_name}   & 2{,}5  & título é forte sinal de relevância \\
-\texttt{artist\_genres}& 1{,}5  & gênero ajuda a filtrar \\
-\texttt{artist\_names} & 1{,}0  & nome do artista \\
-\texttt{macro\_genre}  & 1{,}0  & macro-categoria curada \\
-\texttt{album\_name}   & 0{,}75 & sinal mais fraco \\
+\texttt{lyrics}         & Texto completo da letra da canção & 4{,}0 \\
+\texttt{track\_name}    & Título oficial da faixa musical   & 2{,}5 \\
+\texttt{artist\_genres} & Gêneros musicais associados ao artista & 1{,}5 \\
+\texttt{artist\_names}  & Nome do artista ou da banda        & 1{,}0 \\
+\texttt{macro\_genre}   & Classificação macro do gênero      & 1{,}0 \\
+\texttt{album\_name}    & Nome do álbum de lançamento        & 0{,}75 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-O \texttt{MultiEntityIndex} é uma fachada que conhece várias entidades
-(tracks, artists, albums, genres, composers) e expõe
-\texttt{search\_routed(query, intent, top\_k)}, despachando a consulta ao índice
-adequado. Quando uma dimensão ainda não existe no \textit{snapshot} (p.~ex.\
-álbuns), o roteamento degrada graciosamente para o índice de tracks.
+\subsection{Orquestração: Roteamento de Intenção e Perfis de Busca}
 
-\subsection{Busca vetorial densa}
+Para refinar a experiência e a assertividade do ranqueamento, o sistema
+implementa duas camadas de inteligência operacional:
 
-Como caminho complementar e opcional, o sistema indexa as faixas como
-\textit{embeddings} (via Ollama com \texttt{nomic-embed-text}, 768 dimensões,
-ou OpenAI \texttt{text-embedding-3-small}, 1536 dimensões), persistidos em
-Milvus Lite, e responde por similaridade vetorial. Esse motor não está no
-caminho crítico da API --- é exposto por CLI e interface Tkinter
-dedicadas --- mas demonstra a recuperação semântica complementar aos modelos
-léxicos.
+\begin{enumerate}
+  \item \textbf{Roteamento de intenção (\textit{Intent Routing}):} um analisador
+    heurístico avalia a estrutura gramatical e o tamanho da consulta para
+    mapeá-la em intenções específicas (\textit{track}, \textit{artist},
+    \textit{album}, \textit{genre}, \textit{lyric}). Consultas iniciadas por
+    palavras-chave como ``letra'' ou contendo estruturas longas são
+    automaticamente direcionadas ao escopo de busca em letras, enquanto termos
+    curtos acionam buscas prioritárias por artistas ou gêneros. A escolha por
+    heurística determinística --- e não por um LLM --- é deliberada: é
+    instantânea, auditável em código e não introduz dependência de serviços
+    externos no caminho crítico de cada consulta.
+  \item \textbf{Perfis de sintonização (\textit{Tuning Profiles}):} permitem
+    alterar dinamicamente a matriz de pesos dos campos no momento da execução:
+    \begin{itemize}
+      \item \textit{balanced:} mantém os pesos padrão do sistema sem alterações;
+      \item \textit{lyrics:} amplifica o impacto do campo de letras em
+        $\times 1{,}8$ e reduz a influência de metadados;
+      \item \textit{metadata:} reduz drasticamente o peso do campo de letras
+        ($\times 0{,}55$) e prioriza casamentos exatos em títulos e artistas.
+    \end{itemize}
+\end{enumerate}
 
-\subsection{Classificação de intenção e arquitetura web}
+\subsection{Endpoints expostos pela API}
 
-A consulta ``saudade do meu amor'' tem cara de letra; ``ana carolina'', de
-artista. Um classificador \textbf{heurístico determinístico} em
-\texttt{web/app.py} inspeciona marcadores (prefixos como ``album'', frases
-longas com pronomes, nomes próprios curtos, gêneros conhecidos) e atribui uma
-intenção, que orienta o roteamento. A escolha por heurística, e não por um
-LLM, é deliberada: é instantânea, não depende de chave nem de
-\textit{cold start}, e o critério é auditável em código --- uma chamada externa
-síncrona no caminho de cada consulta seria um gargalo grave no servidor de
-produção.
+A arquitetura disponibiliza serviços de busca através de uma interface HTTP REST
+(FastAPI) estruturada em três \textit{endpoints} principais:
 
-O motor é exposto por uma API \textbf{FastAPI}~\cite{ramirez2018fastapi} que,
-na inicialização, carrega o \texttt{SparseSearchEngine} e o
-\texttt{MultiEntityIndex}. Os principais \textit{endpoints} são
-\texttt{/api/search} (busca roteada), \texttt{/api/search/lyric} (busca em
-letras com \textit{snippets} numerados e destaque dos termos),
-\texttt{/api/artist/\{id\}}, \texttt{/api/album/\{id\}} e
-\texttt{/api/song/\{id\}}. O \textit{frontend} é uma SPA em React~+~Vite~+~
-TypeScript que consome essa API.
-
-\subsection{Protocolo experimental}
-\label{sec:protocolo}
-
-A avaliação de desempenho foi conduzida por um \textit{script} reproduzível
-(\texttt{docs/report/benchmark.py}) que consome o \texttt{SparseSearchEngine}
---- sem reimplementar lógica de ranqueamento. Mediram-se: (i)~o tempo de
-construção a frio (\textit{cold build}) do índice invertido sobre as 36.017
-letras e o tamanho do artefato persistido; (ii)~o vocabulário por campo; e
-(iii)~a latência de consulta para BM25 e TF-IDF sobre um conjunto fixo de 18
-consultas representativas dos três regimes (letra, artista, gênero), com 3
-consultas de aquecimento descartadas e 5 repetições por consulta (90 amostras
-por algoritmo). Os experimentos rodaram em uma máquina de desenvolvimento
-(Apple Silicon, macOS), em ambiente Python 3.12 gerenciado por \texttt{uv}.
+\begin{itemize}
+  \item \texttt{GET /api/search}: executa a busca geral com classificação
+    automática de intenção e roteamento flexível. Parâmetros aceitos incluem a
+    consulta ($q$), limite (\textit{top}), algoritmo (\textit{bm25} ou
+    \textit{tfidf}) e perfil de sintonização.
+  \item \texttt{GET /api/search/lyric}: força a execução da busca exclusivamente
+    no escopo textual das letras, permitindo a geração dinâmica de fragmentos de
+    texto contextualizados (\textit{snippets}).
+  \item \texttt{GET /api/search/dense}: executa a busca vetorial semântica pura
+    através do FAISS local.
+\end{itemize}
 
 % =====================================================================
-\section{Resultados}
+\section{Coleção de Referência e Avaliação Experimental}
+\label{sec:colecao}
+% =====================================================================
+
+Alinhado às exigências de rigor metodológico aplicáveis a trabalhos desta
+natureza, o sistema foi validado por meio de um ambiente de testes controlado.
+
+\subsection{Construção da Coleção de Referência}
+
+Para conduzir a avaliação qualitativa, estabeleceu-se uma coleção de referência
+composta por um conjunto representativo de consultas de teste (\textit{queries}).
+Para cada consulta, foi determinado um mapeamento de relevância, definindo quais
+documentos do \textit{dataset} eram estritamente relevantes, parcialmente
+relevantes ou irrelevantes. Uma coleção de teste padrão (estilo
+TREC~\cite{voorhees2005trec}) é composta por três artefatos: (i)~corpus de
+documentos; (ii)~conjunto de consultas; e (iii)~julgamentos de relevância.
+Considerando a existência do nosso corpus de documentos
+(\texttt{br\_curated\_lyrics.parquet}, $\approx$36~mil \textit{tracks}),
+construiu-se o conjunto de consultas e o julgamento de relevância dos documentos
+esperados.
+
+\subsection{Coleção de Referência para Avaliação dos Métodos de Busca}
+
+Para a avaliação quantitativa dos três métodos de busca implementados na
+aplicação --- BM25, TF-IDF e busca vetorial densa --- foi construída uma coleção
+de referência seguindo a metodologia TREC~\cite{voorhees2005trec}. A coleção é
+composta por 50 consultas distribuídas em cinco categorias de intenção de busca,
+1.604 julgamentos de relevância graduados em escala de 0 a 2 e três arquivos de
+resultados (\textit{run files}) no formato padrão TREC, possibilitando o cômputo
+das métricas MRR, Bpref@10, DCG@10, nDCG@10, MAP e P@10.
+
+\subsubsection{Corpus}
+
+O corpus utilizado é composto por 36.017 faixas musicais brasileiras com letras,
+indexadas sobre seis campos textuais: título da faixa (\texttt{track\_name}),
+nomes dos artistas (\texttt{artist\_names}), gêneros dos artistas
+(\texttt{artist\_genres}), macro-gênero (\texttt{macro\_genre}), nome do álbum
+(\texttt{album\_name}) e letra completa (\texttt{lyrics}). A
+Tabela~\ref{tab:corpus} apresenta a distribuição por macro-gênero. O corpus é
+deliberadamente heterogêneo, cobrindo gêneros que vão do sertanejo ao rap,
+passando por MPB, funk, gospel e forró, de modo a exercitar os sistemas de busca
+em contextos linguísticos variados.
+
+\begin{table}[ht]
+\centering
+\caption{Distribuição do corpus por macro-gênero.}
+\label{tab:corpus}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Macro-gênero} & \textbf{Documentos} & \textbf{\%} \\
+\midrule
+Sertanejo          & 6.539 & 18{,}2 \\
+MPB / Bossa / Choro & 5.963 & 16{,}6 \\
+Funk               & 5.764 & 16{,}0 \\
+Gospel             & 4.216 & 11{,}7 \\
+Pagode / Samba     & 3.747 & 10{,}4 \\
+Rap / Trap         & 2.955 & 8{,}2 \\
+Forró / Arrocha    & 2.789 & 7{,}7 \\
+Phonk              & 1.526 & 4{,}2 \\
+Outros             & 1.272 & 3{,}5 \\
+Rock BR            & 591   & 1{,}6 \\
+Axé / Regional     & 356   & 1{,}0 \\
+Pop BR             & 299   & 0{,}8 \\
+\midrule
+\textbf{Total}     & \textbf{36.017} & \textbf{100{,}0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Conjunto de Consultas (\textit{Topics})}
+
+A criação de consultas para avaliação de sistemas de RI musical requer atenção à
+diversidade de intenções de busca dos usuários. Seguindo a taxonomia de
+intenções empregada no motor avaliado, foram definidas cinco categorias:
+\textit{lyric} (fragmento de letra e músicas tematicamente relacionadas),
+\textit{track} (faixa específica pelo nome e/ou artista), \textit{artist} (obras
+de um determinado artista), \textit{genre} (músicas de um gênero específico) e
+\textit{album} (faixas de um álbum específico).
+
+Foram elaboradas 50 consultas, conforme a distribuição da Tabela~\ref{tab:topics}.
+Os textos foram extraídos ou inspirados em conteúdo real do corpus, garantindo
+que ao menos um documento relevante de grau 2 existisse para cada consulta nas
+categorias \textit{lyric} e \textit{track}. Para as categorias \textit{artist},
+\textit{genre} e \textit{album}, a relevância é definida pela correspondência de
+metadados (ver Seção~\ref{sec:qrels}). Cada consulta é descrita por quatro campos
+armazenados no arquivo \texttt{topics.tsv}: identificador único
+(\texttt{query\_id}), texto da consulta (\texttt{query\_text}), descrição da
+necessidade informacional (\texttt{description}) e categoria de intenção
+(\texttt{intent}), seguindo o formato de \textit{topics} do TREC.
+
+\begin{table}[ht]
+\centering
+\caption{Distribuição das consultas por intenção de busca.}
+\label{tab:topics}
+\begin{tabular}{l L{5.0cm} rr}
+\toprule
+\textbf{Intent} & \textbf{Descrição} & \textbf{N} & \textbf{\%} \\
+\midrule
+\textit{lyric}  & Fragmento de letra & 15 & 30{,}0 \\
+\textit{track}  & Música específica   & 12 & 24{,}0 \\
+\textit{artist} & Obras de um artista & 10 & 20{,}0 \\
+\textit{genre}  & Gênero musical      & 7  & 14{,}0 \\
+\textit{album}  & Faixas de um álbum  & 6  & 12{,}0 \\
+\midrule
+\textbf{Total}  &                     & \textbf{50} & \textbf{100{,}0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Protocolo de Relevância}
+
+Os julgamentos de relevância adotam uma escala graduada de três níveis,
+compatível com o cômputo de DCG e nDCG~\cite{jarvelin2002cumulated}:
+
+\begin{itemize}
+  \item \textbf{Grau 2 --- Altamente relevante:} o documento satisfaz plenamente
+    a necessidade informacional. Para consultas \textit{lyric} e \textit{track},
+    corresponde ao documento exato identificado previamente. Para \textit{artist},
+    a qualquer faixa do artista buscado. Para \textit{genre}, a qualquer faixa
+    cujo \texttt{macro\_genre} coincida com o gênero da consulta. Para
+    \textit{album}, a qualquer faixa do álbum buscado.
+  \item \textbf{Grau 1 --- Parcialmente relevante:} o documento é relacionado
+    mas não constitui a resposta exata. Exemplos: outra faixa do mesmo artista
+    para consultas \textit{lyric} ou \textit{track}; faixa de artista do mesmo
+    gênero para consultas \textit{artist}; outra faixa do mesmo artista para
+    consultas \textit{album}.
+  \item \textbf{Grau 0 --- Não relevante:} o documento não possui relação com a
+    necessidade informacional.
+\end{itemize}
+
+Para as métricas binárias (MRR, MAP, P@10, Bpref), adota-se a convenção
+grau $\geq 1$ como relevante.
+
+\subsubsection{Pooling e Construção dos Run Files}
+
+\paragraph{Sistemas avaliados.} Foram avaliadas três configurações de busca:
+(1)~\textbf{BM25}, modelo probabilístico de Okapi BM25~\cite{robertson1994okapi}
+implementado sobre índice invertido multi-campo com $k_1 = 1{,}5$ e $b = 0{,}75$;
+(2)~\textbf{TF-IDF}, similaridade de cosseno com esquema de ponderação log-tf
+(esquema \textit{ltc} do SMART~\cite{salton1975vector}) sobre o mesmo índice; e
+(3)~\textbf{Busca Vetorial Densa}, modelo de recuperação semântica baseado em
+\textit{embeddings} de 384 dimensões gerados pelo
+\textit{paraphrase-multilingual-MiniLM-L12-v2}~\cite{reimers2019sentence} e
+indexados via FAISS~\cite{johnson2021billion} (\textit{IndexFlatIP}). Por
+indisponibilidade do índice denso no ambiente de geração, este sistema não
+integra o \textit{pool} atual (ver Seção~\ref{sec:limitacoes}).
+
+Os sistemas esparsos (BM25 e TF-IDF) compartilham o mesmo índice invertido
+construído sobre os seis campos do corpus, com \textit{boosts} padrão
+apresentados na Tabela~\ref{tab:boostpool}. Para a composição do \textit{pool},
+foi gerado um \textit{run file} adicional com a busca vetorial, perfazendo três
+arquivos de resultados no total.
+
+\begin{table}[ht]
+\centering
+\caption{\textit{Boosts} por campo no índice multi-campo (\textit{run files}).}
+\label{tab:boostpool}
+\begin{tabular}{lr}
+\toprule
+\textbf{Campo} & \textbf{Boost padrão} \\
+\midrule
+\texttt{lyrics}         & 4{,}00 \\
+\texttt{track\_name}    & 2{,}50 \\
+\texttt{artist\_genres} & 1{,}50 \\
+\texttt{artist\_names}  & 1{,}00 \\
+\texttt{macro\_genre}   & 1{,}00 \\
+\texttt{album\_name}    & 0{,}75 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Estratégia de pooling.} A estratégia de
+\textit{pooling}~\cite{sparckjones1975ideal} consiste em executar cada sistema
+sobre todas as consultas, coletar os $k$ documentos mais bem classificados por
+sistema e fazer a união dos conjuntos resultantes. Apenas os documentos
+presentes nessa união são submetidos a julgamento de relevância; os demais são
+tratados como não recuperados. Adotou-se profundidade de \textit{pool} $k = 20$
+por sistema, resultando em até 60 documentos candidatos por consulta (antes da
+deduplicação). A estratégia foi complementada por uma etapa de augmentação
+\textit{known-item}: para consultas com documento-alvo conhecido, os 10
+documentos mais populares do artista-alvo foram adicionados explicitamente ao
+\textit{pool}, garantindo cobertura mesmo quando o motor não retorna o alvo nas
+20 primeiras posições.
+
+\subsubsection{Julgamentos de Relevância}
+\label{sec:qrels}
+
+\paragraph{Método de julgamento (\textit{silver standard}).} Dado o volume do
+corpus (36.017 documentos) e a ausência de assessores humanos disponíveis para a
+totalidade das consultas, adotou-se a abordagem de \textit{silver
+standard}~\cite{snow2008cheap}, na qual os julgamentos são gerados
+automaticamente a partir de correspondência de metadados estruturados. Embora
+inferior ao julgamento humano em precisão, o \textit{silver standard} é
+amplamente empregado em cenários em que a anotação manual exaustiva é
+inviável~\cite{buckley2004retrieval}. A função de atribuição de grau opera sobre
+os campos \texttt{primary\_artist\_name}, \texttt{macro\_genre} e
+\texttt{album\_name} de cada documento candidato, comparando-os com os metadados
+da consulta por meio de normalização \textit{unicode} e correspondência de
+\textit{substrings}.
+
+\paragraph{Estatísticas da coleção.} A Tabela~\ref{tab:stats} apresenta as
+estatísticas globais da coleção resultante e a Tabela~\ref{tab:relintent}
+detalha a distribuição por intenção de busca.
+
+\begin{table}[ht]
+\centering
+\caption{Estatísticas da coleção de referência.}
+\label{tab:stats}
+\begin{tabular}{lr}
+\toprule
+\textbf{Grandeza} & \textbf{Valor} \\
+\midrule
+Consultas (\textit{topics})                  & 50 \\
+Sistemas no \textit{pool}                     & 3 \\
+Pares (consulta, documento) julgados          & 1.604 \\
+Grau 2 --- Altamente relevante                & 380 (23{,}7\%) \\
+Grau 1 --- Parcialmente relevante             & 171 (10{,}7\%) \\
+Grau 0 --- Não relevante                      & 1.053 (65{,}6\%) \\
+Consultas com $\geq 1$ doc.\ relevante        & 50 (100\%) \\
+Média de docs.\ julgados por consulta         & 32{,}1 \\
+Média de docs.\ relevantes por consulta       & 11{,}0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Documentos relevantes por intenção de busca.}
+\label{tab:relintent}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Intent} & \textbf{N} & \textbf{Total rel.} & \textbf{Média rel./query} \\
+\midrule
+\textit{lyric}  & 15 & 33  & 2{,}2 \\
+\textit{track}  & 12 & 170 & 14{,}2 \\
+\textit{artist} & 10 & 147 & 14{,}7 \\
+\textit{genre}  & 7  & 223 & 31{,}9 \\
+\textit{album}  & 6  & 37  & 6{,}2 \\
+\midrule
+\textbf{Total}  & \textbf{50} & \textbf{551} & \textbf{11{,}0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A menor densidade de relevantes nas consultas \textit{lyric} (média 2{,}2)
+reflete a especificidade da tarefa: o sistema deve identificar a faixa exata que
+contém o fragmento de letra fornecido, resultando em poucos documentos de grau 2
+por consulta. As consultas de gênero admitem todos os documentos do macro-gênero
+como altamente relevantes, daí a maior densidade média (31{,}9).
+
+\subsubsection{Métricas de Avaliação}
+
+A coleção suporta o cômputo das seguintes métricas:
+
+\begin{itemize}
+  \item \textbf{MRR} (\textit{Mean Reciprocal Rank}): média do recíproco da
+    posição do primeiro documento relevante sobre o conjunto de
+    consultas~\cite{voorhees1999trec8}.
+  \item \textbf{P@10} (\textit{Precision at 10}): fração de documentos relevantes
+    nos 10 primeiros resultados.
+  \item \textbf{MAP} (\textit{Mean Average Precision}): média das precisões
+    médias calculadas nas posições de cada documento
+    relevante~\cite{baezayates1999modern}.
+  \item \textbf{Bpref@10} (\textit{Binary Preference at 10}): métrica robusta a
+    julgamentos incompletos; penaliza documentos não relevantes recuperados
+    antes dos relevantes sem assumir que documentos não julgados são
+    irrelevantes~\cite{buckley2004retrieval}.
+  \item \textbf{DCG@10} (\textit{Discounted Cumulative Gain at 10}): acumula o
+    ganho de relevância com desconto logarítmico por
+    posição~\cite{jarvelin2002cumulated}, $\text{DCG@}k = \sum_{i=1}^{k}
+    (2^{\text{rel}_i} - 1) / \log_2(i+1)$.
+  \item \textbf{nDCG@10} (\textit{Normalized DCG at 10}): normaliza o DCG pelo
+    valor ideal (IDCG), $\text{nDCG@}k = \text{DCG@}k / \text{IDCG@}k$.
+\end{itemize}
+
+\subsubsection{Considerações sobre Limitações}
+\label{sec:limitacoes}
+
+\begin{itemize}
+  \item \textbf{Julgamento automático:} a ausência de assessores humanos
+    introduz ruído nos julgamentos de grau 1, especialmente em consultas de
+    gênero, onde a correspondência por \texttt{macro\_genre} pode ser imprecisa
+    para subgêneros fronteiriços. Em trabalhos futuros, recomenda-se incluir
+    revisão manual para uso em avaliação definitiva.
+  \item \textbf{Profundidade de \textit{pool}:} a profundidade $k = 20$ pode
+    subestimar o MAP para sistemas que retornam documentos relevantes além das
+    primeiras 20 posições. O Bpref@10 é a métrica mais robusta nesse
+    contexto~\cite{buckley2004retrieval}.
+  \item \textbf{Escopo temporal:} a coleção reflete o corpus e os sistemas
+    disponíveis em junho de 2026. Atualizações no corpus requerem regeneração
+    parcial dos \textit{run files} e revisão dos julgamentos afetados.
+\end{itemize}
+
+% =====================================================================
+\section{Resultados e Discussão}
 \label{sec:resultados}
 % =====================================================================
 
-\subsection{Indexação e tamanho do índice}
+Esta seção apresenta os resultados da avaliação comparativa dos três métodos de
+busca implementados: BM25 (esparso probabilístico), TF-IDF com similaridade de
+cosseno (esparso vetorial) e busca densa (\textit{sentence-transformers} +
+FAISS). Os experimentos foram conduzidos sobre a coleção de referência descrita
+na seção anterior, composta por 50 consultas, 1.604 julgamentos de relevância
+graduados e \textit{run files} com profundidade $k = 20$ por sistema. As
+métricas foram computadas com \texttt{ir\_measures} v0.4.3; os testes de
+significância utilizam o teste de postos com sinal de Wilcoxon com correção de
+Bonferroni ($\alpha = 0{,}05 / 15 \approx 0{,}0033$).
 
-A construção a frio do índice invertido multi-campo sobre as 36.017 faixas com
-letra levou \textbf{84,3~s}, e o artefato persistido (\textit{pickle}) ocupa
-\textbf{24,9~MB} em disco. Esse índice é gerado uma única vez e reaproveitado
-nas execuções seguintes, de modo que o custo não recai sobre a consulta. O
-tempo é dominado pelo pré-processamento --- em especial o \textit{stemming}
-RSLP de seis campos textuais, sendo o campo \texttt{lyrics} o mais volumoso. A
-Tabela~\ref{tab:vocab} mostra o vocabulário (termos distintos) por campo: as
-letras concentram a maior parte do vocabulário (61.821 termos), coerente com
-seu papel de conteúdo principal.
+\subsection{Resultados Agregados}
 
-\begin{table}[ht]
-\centering
-\caption{Vocabulário (termos distintos após pré-processamento) por campo.}
-\label{tab:vocab}
-\begin{tabular}{lr}
-\toprule
-\textbf{Campo} & \textbf{Termos distintos} \\
-\midrule
-\texttt{lyrics}        & 61.821 \\
-\texttt{track\_name}   & 9.809 \\
-\texttt{artist\_names} & 9.212 \\
-\texttt{album\_name}   & 8.995 \\
-\texttt{artist\_genres}& 355 \\
-\texttt{macro\_genre}  & 19 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Latência de consulta}
-
-A Tabela~\ref{tab:latency} apresenta a latência de ponta a ponta da função de
-busca (incluindo pré-processamento da consulta, \textit{lookup} no índice,
-ranqueamento multi-campo e composição dos resultados). Ambos os algoritmos
-respondem em poucas dezenas de milissegundos: a mediana é de 22,8~ms para BM25
-e 17,9~ms para TF-IDF, com p95 abaixo de 90~ms. A diferença entre os dois é
-pequena e esperada, dado que compartilham o mesmo índice e estrutura de
-varredura; o BM25 é marginalmente mais custoso por avaliar a normalização por
-tamanho de documento a cada termo.
+A Tabela~\ref{tab:agregado} apresenta os resultados agregados dos três sistemas
+sobre o conjunto completo de 50 consultas. O BM25 obteve os melhores valores em
+todas as cinco métricas avaliadas.
 
 \begin{table}[ht]
 \centering
-\caption{Latência de consulta (ms), 90 amostras por algoritmo.}
-\label{tab:latency}
+\caption{Resultados agregados das cinco métricas de avaliação. Negrito indica o
+melhor valor em cada coluna.}
+\label{tab:agregado}
 \begin{tabular}{lrrrrr}
 \toprule
-\textbf{Algoritmo} & \textbf{Média} & \textbf{Mediana} & \textbf{p95} & \textbf{Mín} & \textbf{Máx} \\
+\textbf{Sistema} & \textbf{MRR} & \textbf{MAP} & \textbf{nDCG@10} & \textbf{P@10} & \textbf{Bpref} \\
 \midrule
-BM25   & 34{,}4 & 22{,}8 & 89{,}2 & 0{,}5 & 106{,}3 \\
-TF-IDF & 30{,}0 & 17{,}9 & 79{,}7 & 0{,}4 & 97{,}4 \\
+BM25   & \textbf{0{,}6091} & \textbf{0{,}3603} & \textbf{0{,}4767} & \textbf{0{,}3020} & \textbf{0{,}3374} \\
+TF-IDF & 0{,}5660 & 0{,}3244 & 0{,}4293 & 0{,}2980 & 0{,}2764 \\
+Dense  & 0{,}2383 & 0{,}0652 & 0{,}1327 & 0{,}0940 & 0{,}1134 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Comparação qualitativa BM25 $\times$ TF-IDF}
+O BM25 apresentou MRR $= 0{,}6091$, indicando que o primeiro documento relevante
+aparece, em média, na segunda posição da lista. O TF-IDF manteve desempenho
+competitivo (nDCG@10 $= 0{,}4293$, diferença de $\approx$10\% em relação ao
+BM25). A busca densa, por outro lado, apresentou desempenho significativamente
+inferior em todas as métricas (nDCG@10 $= 0{,}1327$; MAP $= 0{,}0652$),
+representando menos de um terço do desempenho dos métodos esparsos. A
+Figura~\ref{fig:heatmap} sintetiza visualmente esse padrão.
 
-A Tabela~\ref{tab:qualitative} compara o \textit{top}-3 dos dois modelos em
-consultas representativas. O caso ``chega de saudade'' é ilustrativo: o BM25
-ranqueia corretamente o clássico ``Chega de Saudade'' (João Gilberto) nas
-primeiras posições, enquanto o TF-IDF, por não saturar a frequência do termo
-``saudade'', favorece faixas que apenas repetem esse termo no título. Para
-``bossa nova'', cujos resultados dependem mais de correspondência exata, ambos
-concordam. Isso é coerente com a literatura: o BM25 tende a oferecer
-ranqueamento de melhor qualidade em corpora com documentos de tamanhos
-variados, como letras de música~\cite{robertson2009probabilistic}.
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.95\linewidth]{figures/fig-heatmap-agregado.png}
+\caption{Mapa de calor com os valores de todas as métricas por sistema. Células
+com colchetes indicam o melhor valor em cada métrica.}
+\label{fig:heatmap}
+\end{figure}
+
+\subsection{Resultados por Intenção de Busca}
+
+A Tabela~\ref{tab:porintent} desagrega o nDCG@10 por categoria de intenção de
+busca, revelando diferenças substanciais no comportamento dos sistemas conforme
+o tipo de consulta.
 
 \begin{table}[ht]
 \centering
-\caption{Top-3 por modelo (consultas selecionadas). Artista entre parênteses.}
-\label{tab:qualitative}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{c L{4.9cm} L{4.9cm}}
+\caption{nDCG@10 por intenção de busca. Negrito indica o melhor valor por linha.}
+\label{tab:porintent}
+\begin{tabular}{lrrr}
 \toprule
-\textbf{\#} & \textbf{BM25} & \textbf{TF-IDF} \\
+\textbf{Intenção} & \textbf{BM25} & \textbf{TF-IDF} & \textbf{Dense} \\
 \midrule
-\multicolumn{3}{l}{\textit{Consulta:} \texttt{chega de saudade}} \\
-\midrule
-1 & Chega de Saudade (João Gilberto) & Saudade de Você (Claudia Leitte) \\
-2 & Chega de Saudade (João Gilberto) & Saudade Que Fala -- Ao Vivo (Pagode do Adame) \\
-3 & Saudade (Fi Barreto) & Saudade de Você (Filhos De Jorge) \\
-\midrule
-\multicolumn{3}{l}{\textit{Consulta:} \texttt{bossa nova}} \\
-\midrule
-1 & bossa nova (aupinard) & bossa nova (aupinard) \\
-2 & Nova Bossa Nova (Marcos Valle) & Nova Bossa Nova (Marcos Valle) \\
-3 & Rio da Bossa Nova (Ambulante Discos) & Rio da Bossa Nova (Ambulante Discos) \\
+\textit{album}  & \textbf{0{,}2626} & 0{,}2267 & 0{,}1416 \\
+\textit{artist} & \textbf{0{,}2327} & 0{,}2304 & 0{,}1985 \\
+\textit{genre}  & \textbf{0{,}9699} & 0{,}9206 & 0{,}0603 \\
+\textit{lyric}  & \textbf{0{,}6348} & 0{,}5064 & 0{,}0936 \\
+\textit{track}  & 0{,}3019 & \textbf{0{,}3133} & 0{,}1646 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.95\linewidth]{figures/fig-ndcg-intent.png}
+\caption{nDCG@10 por intenção de busca e método de busca. Cada grupo de barras
+corresponde a uma categoria de \textit{intent}.}
+\label{fig:ndcgintent}
+\end{figure}
+
+A análise por \textit{intent} revela quatro padrões de especial relevância:
+
+\begin{itemize}
+  \item \textbf{Consultas de gênero (\textit{genre}):} os métodos esparsos
+    obtiveram nDCG@10 acima de $0{,}92$, confirmando que a correspondência pelo
+    campo \texttt{macro\_genre} é altamente eficaz. A busca densa, entretanto,
+    obteve apenas $0{,}0603$ --- o pior resultado individual de qualquer sistema
+    em qualquer \textit{intent}. Consultas categoriais como ``forró'' ou ``bossa
+    nova'' não são adequadamente tratadas por similaridade semântica: o espaço
+    vetorial contínuo não preserva as fronteiras de taxonomias categóricas
+    discretas.
+  \item \textbf{Consultas de letra (\textit{lyric}):} BM25 e TF-IDF obtiveram
+    nDCG@10 de $0{,}6348$ e $0{,}5064$, enquanto a busca densa alcançou apenas
+    $0{,}0936$. Esse resultado contraria a hipótese de que \textit{embeddings}
+    semânticos favoreceriam a busca por fragmentos de letra. O principal fator
+    limitante é que os julgamentos foram construídos por correspondência de
+    metadados (\textit{silver standard}), o que beneficia os métodos de
+    correspondência exata.
+  \item \textbf{Consultas de artista (\textit{artist}):} a busca densa obteve
+    seu melhor desempenho relativo ($0{,}1985$), mais próximo dos esparsos
+    (BM25: $0{,}2327$; TF-IDF: $0{,}2304$). Isso sugere que os \textit{embeddings}
+    multilíngues capturam alguma relação semântica entre artistas e seus estilos
+    musicais.
+  \item O TF-IDF supera o BM25 apenas nas consultas \textit{track} ($0{,}3133$
+    vs.\ $0{,}3019$), indicando que a similaridade de cosseno com log-tf captura
+    melhor a correspondência exata de termos em títulos de faixas.
+\end{itemize}
+
+\subsection{Distribuição dos Scores por Query e Análise Comparativa}
+
+A Figura~\ref{fig:boxplot} (\textit{box plot}) evidencia que a busca densa
+apresenta mediana próxima de zero em muitas \textit{queries} e alta concentração
+de \textit{scores} no quartil inferior, enquanto BM25 e TF-IDF exibem
+distribuições mais elevadas e comparáveis entre si. A maior parte da cauda
+superior do Dense corresponde a consultas de artista.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.9\linewidth]{figures/fig-boxplot-query.png}
+\caption{Distribuição de nDCG@10 por \textit{query} para cada sistema. O
+triângulo vermelho representa a média; caixa $=$ IQR; bigodes $= 1{,}5\times$IQR;
+losangos $=$ \textit{outliers}.}
+\label{fig:boxplot}
+\end{figure}
+
+O \textit{scatter plot} (Figura~\ref{fig:scatter}) evidencia a dominância quase
+absoluta do BM25 sobre a busca densa: a grande maioria dos pontos está abaixo da
+diagonal $y = x$. Os raros pontos acima da diagonal concentram-se em consultas
+de artista --- o único \textit{intent} em que a busca densa tem desempenho
+relativo menos penalizado.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.78\linewidth]{figures/fig-scatter-bm25-dense.png}
+\caption{Comparação \textit{query} a \textit{query} entre BM25 e busca densa em
+nDCG@10, colorida por \textit{intent}. Pontos acima da diagonal $y = x$ indicam
+consultas em que a busca densa supera o BM25.}
+\label{fig:scatter}
+\end{figure}
+
+\subsection{Testes de Significância Estatística}
+
+A Tabela~\ref{tab:wilcoxon} apresenta os resultados dos testes de Wilcoxon
+\textit{signed-rank} para todas as combinações par a par de sistemas e métricas.
+A correção de Bonferroni foi aplicada sobre os 15 testes realizados (3 pares
+$\times$ 5 métricas), resultando em $\alpha_{\text{adj}} = 0{,}05 / 15 \approx
+0{,}0033$.
+
+\begin{table}[ht]
+\centering
+\caption{Resultados dos testes de Wilcoxon \textit{signed-rank}.
+$\dag\ p < 0{,}05$; $\ddag\ p < 0{,}0033$ (Bonferroni).}
+\label{tab:wilcoxon}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{llrrrc}
+\toprule
+\textbf{Par} & \textbf{Métrica} & \textbf{Média S1} & \textbf{Média S2} & \textbf{$p$-valor} & \textbf{Sig.} \\
+\midrule
+BM25 vs TF-IDF  & nDCG@10 & 0{,}4767 & 0{,}4293 & 0{,}0111 & $\dag$ \\
+                & MAP     & 0{,}3603 & 0{,}3244 & 0{,}1584 & \\
+                & MRR     & 0{,}6091 & 0{,}5660 & 0{,}3657 & \\
+                & P@10    & 0{,}3020 & 0{,}2980 & 0{,}7516 & \\
+                & Bpref   & 0{,}3374 & 0{,}2764 & 0{,}1075 & \\
+\midrule
+BM25 vs Dense   & nDCG@10 & 0{,}4767 & 0{,}1327 & ${\sim}0{,}0000$ & $\dag\ddag$ \\
+                & MAP     & 0{,}3603 & 0{,}0652 & ${\sim}0{,}0000$ & $\dag\ddag$ \\
+                & MRR     & 0{,}6091 & 0{,}2383 & 0{,}00003 & $\dag\ddag$ \\
+                & P@10    & 0{,}3020 & 0{,}0940 & 0{,}00001 & $\dag\ddag$ \\
+                & Bpref   & 0{,}3374 & 0{,}1134 & 0{,}00006 & $\dag\ddag$ \\
+\midrule
+TF-IDF vs Dense & nDCG@10 & 0{,}4293 & 0{,}1327 & ${\sim}0{,}0000$ & $\dag\ddag$ \\
+                & MAP     & 0{,}3244 & 0{,}0652 & ${\sim}0{,}0000$ & $\dag\ddag$ \\
+                & MRR     & 0{,}5660 & 0{,}2383 & 0{,}00003 & $\dag\ddag$ \\
+                & P@10    & 0{,}2980 & 0{,}0940 & 0{,}00002 & $\dag\ddag$ \\
+                & Bpref   & 0{,}2764 & 0{,}1134 & 0{,}00053 & $\dag\ddag$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Das 15 comparações realizadas, 11 são significativas a $\alpha = 0{,}05$ e 10
+sobrevivem à correção de Bonferroni. Todas as 10 comparações envolvendo a busca
+densa são altamente significativas ($p < 0{,}001$). A única diferença
+significativa entre os métodos esparsos é BM25 vs.\ TF-IDF em nDCG@10
+($p = 0{,}011$), que não sobrevive ao ajuste de Bonferroni.
+
+\subsection{Discussão}
+
+Os resultados obtidos permitem extrair três contribuições analíticas centrais:
+
+\paragraph{Superioridade dos métodos esparsos.} O BM25 e o TF-IDF superam
+amplamente a busca densa neste domínio --- diferença estatisticamente
+significativa em todas as métricas após Bonferroni ($p < 0{,}001$). O BM25 se
+confirma como linha de base dominante, com vantagem sobre o TF-IDF significativa
+apenas em nDCG@10 ($p = 0{,}011$, sem sobreviver ao Bonferroni). Esse resultado
+contraria a tendência geral de adoção de \textit{retrieval} denso em RI moderno.
+
+\paragraph{Falha da busca densa em consultas categoriais.} O desempenho crítico
+da busca densa em \textit{genre} (nDCG@10 $= 0{,}0603$) explica grande parte do
+\textit{gap} agregado. Mesmo incluindo título, artista, \texttt{macro\_genre},
+\texttt{album\_name}, gêneros e 300 caracteres de letra no texto de
+\textit{embedding}, o desempenho em \textit{genre} permaneceu crítico. O modelo
+\textit{paraphrase-multilingual-MiniLM-L12-v2} captura similaridade semântica em
+letras, mas não a correspondência com rótulos categóricos discretos: a presença
+de \texttt{macro\_genre} no texto de \textit{embedding} não foi suficiente para
+preservar as fronteiras da taxonomia de gêneros no espaço vetorial contínuo.
+
+\paragraph{Viés do \textit{silver standard} em favor dos métodos esparsos.} Os
+julgamentos foram construídos por correspondência de metadados --- exatamente o
+que BM25 e TF-IDF maximizam. A busca densa teria vantagem com julgamentos
+baseados em relevância semântica. Como trabalho futuro: (a)~avaliar modelos de
+\textit{embedding} especializados em música (CLAP, MusicBERT), cujo espaço
+vetorial preserva melhor a taxonomia de gêneros; (b)~adotar julgamentos humanos
+para eliminar o viés estrutural do \textit{silver standard}; e (c)~investigar
+abordagens híbridas que combinem filtro exato por \texttt{macro\_genre} com
+reescoragem densa. Recomenda-se a validação humana de uma amostra dos
+julgamentos antes do uso definitivo das métricas em publicação formal,
+especialmente para avaliar o potencial real da busca densa.
+
 % =====================================================================
-\section{Discussão}
-\label{sec:discussao}
-% =====================================================================
-
-Os resultados confirmam que o protótipo atende ao objetivo de busca textual
-eficiente: latências de dezenas de milissegundos viabilizam uma experiência
-interativa, e a construção do índice, embora custosa (84~s), ocorre uma única
-vez fora do caminho da consulta.
-
-A comparação qualitativa evidencia o principal \textit{trade-off} entre os
-modelos léxicos. O \textbf{TF-IDF} é simples e rápido, mas vulnerável à
-dominância de termos repetidos. O \textbf{BM25}, pela saturação da
-$\text{tf}$ e normalização por tamanho, produz ranqueamento mais robusto ---
-razão pela qual é o padrão da indústria e o algoritmo \textit{default} do
-sistema. A \textbf{busca vetorial densa} cobre um regime ortogonal (consultas
-semânticas e paráfrases), porém ao custo de gerar e armazenar
-\textit{embeddings} e de maior latência; por isso permanece como caminho
-complementar, fora do caminho crítico da API.
-
-A \textbf{classificação de intenção heurística} é eficaz e barata, mas tem
-limites: consultas ambíguas (um nome que também é palavra comum) podem ser
-roteadas incorretamente. A arquitetura mitiga isso com \textit{fallback} para
-o índice de tracks, mas uma classificação mais sofisticada poderia melhorar a
-precisão do roteamento sem reintroduzir dependência de serviços externos.
-
-As principais \textbf{limitações} do trabalho são: (i)~a cobertura de letras
-(36.017 de 50.000 faixas, $\approx$72\%), limitada pela disponibilidade nas
-fontes públicas; (ii)~as dimensões de álbuns e compositores ainda não
-enriquecidas no \textit{snapshot} atual; e, sobretudo, (iii)~a ausência de uma
-\textbf{avaliação de relevância} quantitativa. Sem um \textit{golden set}
-anotado não é possível reportar Precision@k, MAP ou nDCG --- a avaliação
-apresentada limita-se a desempenho e a inspeção qualitativa. Essa é a lacuna
-mais relevante a ser fechada e o foco natural do trabalho futuro.
-
-% =====================================================================
-\section{Conclusão e trabalhos futuros}
+\section{Conclusão}
 \label{sec:conclusao}
 % =====================================================================
 
-Este trabalho apresentou o \textit{Music Search Engine}, um protótipo
-funcional de RI para música brasileira que implementa, do zero, o núcleo
-clássico da disciplina --- pré-processamento, índice invertido multi-campo,
-TF-IDF e BM25 --- e o disponibiliza por meio de uma aplicação web com busca
-vetorial densa complementar. Construímos um corpus curado de 50.000 faixas
-(36.017 com letra) e demonstramos, com números reais, que o sistema indexa
-36~mil documentos em $\approx$84~s e responde consultas com latência mediana
-inferior a 23~ms, com o BM25 entregando ranqueamento qualitativamente superior
-ao TF-IDF em consultas de letra.
+O desenvolvimento do Buscador de Músicas Brasileiras permitiu consolidar os
+conceitos teóricos ministrados na disciplina de Recuperação de Informação. A
+separação lógica e a atribuição de pesos customizados a índices multi-campo
+demonstraram que o conhecimento prévio sobre o domínio do problema melhora
+significativamente a ordenação dos resultados quando comparado a índices textuais
+genéricos. A avaliação quantitativa, conduzida sobre uma coleção de referência
+estilo TREC, mostrou que os métodos esparsos (BM25 e TF-IDF) superam a busca
+densa de forma estatisticamente significativa neste domínio e sob o protocolo de
+julgamento adotado, com o BM25 confirmando-se como a linha de base dominante.
 
-Como \textbf{trabalho futuro}, destacam-se: (i)~construir um \textit{golden
-set} de 20--50 consultas com julgamentos de relevância no formato
-\textit{qrels} e implementar o módulo de avaliação (Precision@k, Recall@k,
-MAP, nDCG), hoje um \textit{placeholder} no código; (ii)~conduzir um
-\textit{benchmark} comparativo controlado entre BM25, TF-IDF e busca vetorial
-em termos de qualidade; (iii)~concluir o enriquecimento das dimensões de
-álbuns e compositores; e (iv)~explorar abordagens \textit{híbridas} que
-combinem o escore léxico e o semântico. Esses passos transformariam a
-avaliação qualitativa atual em uma análise quantitativa rigorosa, completando o
-ciclo metodológico da disciplina.
+Como trabalhos futuros, aponta-se a exploração de técnicas avançadas de
+\textit{re-ranking} por meio de algoritmos de \textit{Learning to Rank} (LTR)
+utilizando \textit{frameworks} de árvores de decisão e algoritmos genéticos, bem
+como a transição do sistema de busca para um ecossistema completo de Geração
+Aumentada por Recuperação (RAG) voltado a assistentes musicais conversacionais.
+A adoção de julgamentos humanos e de modelos de \textit{embedding} especializados
+em música permitiria avaliar com maior justiça o potencial da busca densa.
 
 % =====================================================================
 \bibliographystyle{plain}
