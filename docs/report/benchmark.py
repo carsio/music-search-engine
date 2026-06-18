@@ -167,7 +167,7 @@ def render_markdown(
         )
     lines.append("")
 
-    lines.append("## Comparação qualitativa BM25 × TF-IDF (top-3)\n")
+    lines.append("## Comparação qualitativa BM25 × TF-IDF (top-3)\n")  # noqa: RUF001
     for query, by_algo in qualitative.items():
         lines.append(f"### Consulta: `{query}`\n")
         lines.append("| # | BM25 | TF-IDF |")
