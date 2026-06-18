@@ -4,7 +4,7 @@
 
 Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFAM 2026/1).
 
-📊 Slides: <https://carsio.github.io/music-search-engine/>
+📊 Slides (apresentação, 20 telas): <https://carsio.github.io/music-search-engine/> — deck HTML em `slides/`, publicado via GitHub Pages e com a mesma identidade visual do frontend.
 
 📄 Relatório técnico (PDF, última versão): **[main.pdf](https://github.com/carsio/music-search-engine/releases/download/report-latest/main.pdf)** — gerado automaticamente a cada build a partir de [`docs/report/`](docs/report).
 
@@ -340,7 +340,7 @@ painel de artefatos gerados (`br_*.parquet` e `br_dataset_manifest.json`).
 - `.vscode/`: atalhos de debug e tasks para backend, frontend e full stack.
 - `.github/workflows/`: CI e deploy dos slides.
 - `reference-web/`: protótipos e referências de UI.
-- `slides/`: apresentação publicada do projeto.
+- `slides/`: apresentação publicada do projeto — deck HTML de 20 slides (`index.html` + `deck-stage.js`) na identidade visual do frontend, do tema TREC à conclusão.
 - `docs/`: guia didático completo (`GUIA.md`) e documentação auxiliar.
 
 ## Atalhos no VSCode
