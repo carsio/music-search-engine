@@ -1,0 +1,63 @@
+% =====================================================================
+% sbc-template.sty — folha de estilo auto-contida que reproduz o layout
+% padrão de artigos da Sociedade Brasileira de Computação (SBC).
+%
+% Vendorizada no repositório (não é pacote CTAN) para que `tectonic` e a
+% pipeline do GitHub Actions compilem o relatório offline, usando apenas
+% pacotes presentes no bundle padrão. Reproduz as convenções SBC: A4,
+% Times, título centralizado em negrito, bloco de autores e instituição,
+% e ambientes `resumo` / `abstract`.
+% =====================================================================
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{sbc-template}[2026/06/15 Layout estilo SBC (auto-contido)]
+
+\RequirePackage[a4paper,top=3.5cm,bottom=2.5cm,left=3.0cm,right=3.0cm]{geometry}
+\RequirePackage{indentfirst}
+\RequirePackage{mathptmx}          % Times para texto e matemática
+\RequirePackage[scaled=.92]{helvet}
+\RequirePackage{courier}
+
+\setlength{\parindent}{1.27cm}
+\setlength{\parskip}{0pt}
+
+% ------- Seções em negrito, tamanho moderado (estilo SBC) -------------
+\RequirePackage[explicit]{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{#1}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{#1}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection.}{0.5em}{#1}
+\titlespacing*{\section}{0pt}{12pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+
+% ------- Bloco de autores / instituição -------------------------------
+\newcommand{\inst}[1]{\unskip$^{#1}$}
+\newcommand{\email}[1]{{\ttfamily #1}}
+
+\def\@institute{}
+\newcommand{\institute}[1]{\gdef\@institute{#1}}
+
+\renewcommand{\maketitle}{%
+  \begingroup
+  \def\and{\unskip\hspace{1.5em}\ignorespaces}%
+  \begin{center}
+    {\Large\bfseries \@title \par}
+    \vspace{1.2em}
+    {\large \@author \par}
+    \vspace{0.6em}
+    {\normalsize \@institute \par}
+  \end{center}
+  \endgroup
+  \vspace{1.0em}
+}
+
+% ------- Resumo e Abstract --------------------------------------------
+\newenvironment{resumo}%
+  {\begin{center}\textbf{Resumo}\end{center}%
+   \begin{quotation}\noindent\ignorespaces}%
+  {\end{quotation}}
+
+\renewenvironment{abstract}%
+  {\begin{center}\textbf{Abstract}\end{center}%
+   \begin{quotation}\noindent\ignorespaces}%
+  {\end{quotation}}
+
+\endinput

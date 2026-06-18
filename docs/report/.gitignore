@@ -1,0 +1,11 @@
+# Artefatos de build do LaTeX (o PDF canônico vem da pipeline do GitHub Actions)
+main.pdf
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz

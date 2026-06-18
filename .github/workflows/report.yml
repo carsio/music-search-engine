@@ -1,0 +1,52 @@
+name: Report PDF
+
+on:
+  push:
+    branches: [master, "docs/report"]
+    paths:
+      - "docs/report/**"
+      - ".github/workflows/report.yml"
+  pull_request:
+    paths:
+      - "docs/report/**"
+      - ".github/workflows/report.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: report-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tectonic
+        run: |
+          curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh
+          echo "$PWD" >> "$GITHUB_PATH"
+
+      - name: Compile report
+        working-directory: docs/report
+        run: tectonic main.tex --print
+
+      - name: Verify page count (8-12)
+        working-directory: docs/report
+        run: |
+          sudo apt-get update && sudo apt-get install -y poppler-utils
+          pages=$(pdfinfo main.pdf | awk '/^Pages:/ {print $2}')
+          echo "Páginas: $pages"
+          if [ "$pages" -lt 8 ] || [ "$pages" -gt 12 ]; then
+            echo "::warning::Relatório com $pages páginas (esperado entre 8 e 12)."
+          fi
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-icc222
+          path: docs/report/main.pdf
+          if-no-files-found: error
