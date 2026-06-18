@@ -1,0 +1,66 @@
+name: Report PDF
+
+on:
+  push:
+    branches: [master, "docs/report"]
+    paths:
+      - "docs/report/**"
+      - ".github/workflows/report.yml"
+  pull_request:
+    paths:
+      - "docs/report/**"
+      - ".github/workflows/report.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: report-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tectonic
+        run: |
+          curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh
+          echo "$PWD" >> "$GITHUB_PATH"
+
+      - name: Compile report
+        working-directory: docs/report
+        run: tectonic main.tex --print
+
+      - name: Verify page count (8-16)
+        working-directory: docs/report
+        run: |
+          sudo apt-get update && sudo apt-get install -y poppler-utils
+          pages=$(pdfinfo main.pdf | awk '/^Pages:/ {print $2}')
+          echo "Páginas: $pages"
+          if [ "$pages" -lt 8 ] || [ "$pages" -gt 16 ]; then
+            echo "::warning::Relatório com $pages páginas (esperado entre 8 e 16)."
+          fi
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-icc222
+          path: docs/report/main.pdf
+          if-no-files-found: error
+
+      # Publica o PDF num release de tag móvel só no push para master,
+      # dando ao README um link estável para a última versão gerada.
+      - name: Publish PDF to rolling release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: report-latest
+          name: Relatório técnico (última versão)
+          body: |
+            PDF do relatório técnico gerado automaticamente a partir de
+            `docs/report/main.tex` no commit ${{ github.sha }}.
+          files: docs/report/main.pdf
+          fail_on_unmatched_files: true
