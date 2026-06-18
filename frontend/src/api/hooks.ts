@@ -12,6 +12,7 @@ import type {
 import type { SearchProfile, SearchTfScheme } from "../hooks/useSearchSettings";
 
 type Opts<T> = Pick<UseQueryOptions<T>, "enabled" | "staleTime">;
+type SparseSearchAlgorithm = Exclude<SearchAlgorithm, "dense">;
 
 interface SearchOpts extends Opts<SearchResponse> {
   algorithm?: SearchAlgorithm;
@@ -56,7 +57,7 @@ export function useSearch(query: string, opts: SearchOpts = {}) {
 }
 
 interface LyricOpts extends Opts<LyricSearchResponse> {
-  algorithm?: SearchAlgorithm;
+  algorithm?: SparseSearchAlgorithm;
   top?: number;
   profile?: SearchProfile;
   bm25K1?: number;

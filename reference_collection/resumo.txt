@@ -1,0 +1,120 @@
+RESUMO DA COLEÇÃO DE REFERÊNCIA
+================================
+Projeto : Buscador de Músicas Brasileiras (ICC222 / UFAM 2026/1)
+Data    : 2026-06-14
+Corpus  : br_curated_lyrics.parquet — 36.017 documentos (tracks com letra)
+
+ESTATÍSTICAS GERAIS
+  Consultas (topics)            : 50
+  Sistemas no pool              : 3 (BM25, TF-IDF, BM25-Lyric)
+  Total de pares julgados       : 1.604
+    Grau 2 — Altamente rel.    :   380  (23,7 %)
+    Grau 1 — Parcialmente rel. :   171  (10,7 %)
+    Grau 0 — Não relevante     : 1.053  (65,6 %)
+  Queries com >= 1 doc relevante: 50 / 50  (100 %)
+  Média de docs julgados/query  :  32,1
+  Média de docs relevantes/query:  11,0
+
+DISTRIBUIÇÃO DE INTENTS
+  lyric  : 15 consultas (Q001–Q015)  — fragmentos de letras
+  track  : 12 consultas (Q016–Q027)  — busca por música específica
+  artist : 10 consultas (Q028–Q037)  — busca por artista
+  genre  :  7 consultas (Q038–Q044)  — busca por gênero musical
+  album  :  6 consultas (Q045–Q050)  — busca por álbum
+
+DOCUMENTOS RELEVANTES POR QUERY
+  Q001 [lyric ]  2 rel  — não sabe o que é sofrer ter que ver você sempre tão linda
+  Q002 [lyric ]  2 rel  — vida loka sofrimento e glória da favela
+  Q003 [lyric ]  5 rel  — velha infância tribalistas
+  Q004 [lyric ]  5 rel  — ela quer rolar na minha silverado cowboy
+  Q005 [lyric ]  1 rel  — depois de tantos planos de um futuro para nós nos abandonamos
+  Q006 [lyric ]  1 rel  — me encontra que espero a tanto tempo em meio à multidão
+  Q007 [lyric ]  3 rel  — um minuto para o fim do mundo punk rock
+  Q008 [lyric ]  2 rel  — louca por ti amor demais na praia nos dois
+  Q009 [lyric ]  1 rel  — há um vento fresco algo maravilhoso está por vir gospel
+  Q010 [lyric ]  3 rel  — coração partido não me acostumei dividir você pagode
+  Q011 [lyric ]  2 rel  — amor o meu coração pede só pra te amar ficar com você meu anjo
+  Q012 [lyric ]  1 rel  — cedo ou tarde vamos nos encontrar rock nacional
+  Q013 [lyric ]  2 rel  — poderosa olhar de diamante agita o salão funk
+  Q014 [lyric ]  2 rel  — vai e vem não sai de órbita eita vida torta sertanejo
+  Q015 [lyric ]  2 rel  — mesmo que eu vá correndo sem direção ainda assim vou lutar gospel
+  Q016 [track ] 15 rel  — Anna Júlia Los Hermanos
+  Q017 [track ] 13 rel  — Velha Infância Tribalistas
+  Q018 [track ] 15 rel  — Vida Loka Racionais MC's
+  Q019 [track ] 12 rel  — Dormi Na Praça Chitãozinho Xororó
+  Q020 [track ] 12 rel  — Obrigado por Estragar Tudo Marília Mendonça
+  Q021 [track ] 22 rel  — Me Ama Ou Me Larga Simone Mendes
+  Q022 [track ] 13 rel  — Apaguei Pra Todos Ferrugem
+  Q023 [track ] 11 rel  — Dias Atrás CPM 22
+  Q024 [track ] 10 rel  — Depois Marisa Monte
+  Q025 [track ] 10 rel  — Ovelhinha Isadora Pompeo
+  Q026 [track ] 14 rel  — Silverado Luan Pereira sertanejo
+  Q027 [track ]  4 rel  — Insônia Tribo da Periferia rap
+  Q028 [artist] 16 rel  — Djavan
+  Q029 [artist] 22 rel  — Racionais MC's rap
+  Q030 [artist] 13 rel  — Marília Mendonça sertanejo feminejo
+  Q031 [artist] 14 rel  — Chitãozinho e Xororó dupla sertaneja
+  Q032 [artist] 19 rel  — Tribalistas MPB
+  Q033 [artist] 10 rel  — CPM 22 rock nacional
+  Q034 [artist] 12 rel  — Ferrugem pagode
+  Q035 [artist] 11 rel  — Calcinha Preta forró
+  Q036 [artist] 10 rel  — Isadora Pompeo gospel
+  Q037 [artist] 11 rel  — Jorge e Mateus sertanejo
+  Q038 [genre ] 26 rel  — forró
+  Q039 [genre ] 25 rel  — bossa nova MPB clássica
+  Q040 [genre ] 30 rel  — samba pagode
+  Q041 [genre ] 33 rel  — funk carioca baile
+  Q042 [genre ] 32 rel  — gospel louvor adoração
+  Q043 [genre ] 27 rel  — rap nacional hip hop brasileiro
+  Q044 [genre ] 24 rel  — sertanejo universitário
+  Q045 [album ]  9 rel  — album Tribalistas
+  Q046 [album ]  1 rel  — Nada Como um Dia Após o Outro Dia Racionais
+  Q047 [album ]  4 rel  — Escândalo Íntimo Luísa Sonza
+  Q048 [album ] 10 rel  — Caetano e Bethânia ao vivo album
+  Q049 [album ]  5 rel  — Acústico Engenheiros do Hawaii
+  Q050 [album ]  2 rel  — Grandes Sucessos Raça Negra pagode
+
+MÉTODO DE JULGAMENTO
+  Tipo       : Silver standard automático (metadata matching)
+  Protocolo  : ver protocolo.txt para critérios completos por intent
+  Pool base  : top-20 por sistema (3 sistemas = até 60 docs únicos por query)
+  Augmentação: top-10 por popularidade do artista-alvo / doc-alvo (known-item)
+               Garante cobertura mesmo quando o motor não retorna o alvo no top-20.
+  Conversão binária para MRR / MAP / P@10 / Bpref: grau >= 1 = relevante
+
+ARQUIVOS DA COLEÇÃO
+  topics.tsv              — 50 consultas (ID, texto, descrição, intent)
+  protocolo.txt           — critérios de relevância documentados
+  qrels.tsv               — 1.604 julgamentos no formato TREC
+  runs/bm25.txt           — run file BM25   (50 queries × top-20)
+  runs/tfidf.txt          — run file TF-IDF (50 queries × top-20)
+  runs/lyric.txt          — run file busca lírica (BM25 perfil lyrics, 50 × top-20)
+  scripts/build_test_collection.py  — script principal de geração
+  scripts/rebuild_qrels.py          — script de reprocessamento dos julgamentos
+
+FORMATO DOS ARQUIVOS (padrão TREC)
+
+  topics.tsv
+    query_id <TAB> query_text <TAB> description <TAB> intent
+
+  qrels.tsv
+    query_id <TAB> 0 <TAB> doc_id <TAB> grau
+    (grau: 0 = não relevante, 1 = parcialmente relevante, 2 = altamente relevante)
+
+  runs/*.txt
+    query_id <TAB> Q0 <TAB> doc_id <TAB> rank <TAB> score <TAB> sistema
+
+COMO CALCULAR AS MÉTRICAS
+  Instalar: pip install ir-measures
+
+  import ir_measures
+  from ir_measures import *
+
+  qrels = ir_measures.read_trec_qrels("qrels.tsv")
+  run   = ir_measures.read_trec_run("runs/bm25.txt")
+
+  resultados = ir_measures.calc_aggregate(
+      [MRR, Bpref@10, nDCG@10, DCG@10, AP, P@10],
+      qrels, run
+  )
+  print(resultados)

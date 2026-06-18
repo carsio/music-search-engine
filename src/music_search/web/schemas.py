@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 Intent = Literal["artist", "album", "song", "lyric", "genre", "none", "track"]
-SearchAlgorithm = Literal["bm25", "tfidf"]
+SearchAlgorithm = Literal["bm25", "tfidf", "dense"]
 
 
 class AlbumRef(BaseModel):

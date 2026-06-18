@@ -5,8 +5,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    volumes:
-      - search-indexes:/app/data/indexes
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz').read()"]
       interval: 30s
@@ -14,6 +12,3 @@ services:
       retries: 5
       start_period: 40s
     restart: unless-stopped
-
-volumes:
-  search-indexes:

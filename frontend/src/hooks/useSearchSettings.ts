@@ -38,7 +38,7 @@ export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
 };
 
 function isAlgorithm(value: string | null | undefined): value is SearchAlgorithm {
-  return value === "bm25" || value === "tfidf";
+  return value === "bm25" || value === "tfidf" || value === "dense";
 }
 
 function isProfile(value: string | null | undefined): value is SearchProfile {

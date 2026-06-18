@@ -20,6 +20,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dense = [
+    "sentence-transformers>=3.0",
+    "faiss-cpu>=1.7",
+]
 vector = [
     "pymilvus>=2.4",
     "openai>=1.50",
@@ -41,9 +45,11 @@ dev = [
     "pytest-cov>=6.1",
     "pre-commit>=4.2",
     "ipykernel>=6.29",
+    "ir-measures>=0.3",
     "kaggle>=2.0.1",
     "matplotlib>=3.9",
     "seaborn>=0.13",
+    "scipy>=1.14",
     "jupyter>=1.1",
     "nbconvert>=7.16",
 ]

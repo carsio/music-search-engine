@@ -1,0 +1,109 @@
+ANÁLISE QUALITATIVA — nDCG@10 por Query e Sistema
+======================================================================
+Data     : 2026-06-17 21:54
+Métrica  : nDCG@10 | Sistemas: BM25, TF-IDF, Dense
+
+1. QUERIES DIFÍCEIS PARA TODOS OS SYSTEMS (média nDCG@10 < 0.10)
+   QID     Intent          BM25      TF-IDF       Dense  Query
+   -----------------------------------------------------------------
+   Q011    lyric         0.0000      0.0000      0.0000  amor o meu coração pede só pra te amar f
+   Q033    artist        0.0000      0.0000      0.0000  CPM 22 rock nacional
+   Q046    album         0.0000      0.0000      0.0000  Nada Como um Dia Após o Outro Dia Racion
+   Q050    album         0.0000      0.0000      0.0000  Grandes Sucessos Raça Negra pagode
+   Q028    artist        0.0000      0.0000      0.0734  Djavan
+   Q027    track         0.0000      0.0000      0.1086  Insônia Tribo da Periferia rap
+   Q034    artist        0.0784      0.0851      0.0000  Ferrugem pagode
+   Q037    artist        0.0663      0.0694      0.0851  Jorge e Mateus sertanejo
+   Q036    artist        0.0000      0.0000      0.2344  Isadora Pompeo gospel
+   Q030    artist        0.2025      0.0784      0.0000  Marília Mendonça sertanejo feminejo
+
+2. TOP-10 QUERIES COM MAIOR DIVERGÊNCIA ENTRE SYSTEMS
+   QID     Intent          BM25      TF-IDF       Dense    Diff  Melhor          Query
+   -----------------------------------------------------------------
+   Q006    lyric         1.0000      1.0000      0.0000   1.000  BM25            me encontra que espero a tanto temp
+   Q009    lyric         1.0000      0.6309      0.0000   1.000  BM25            há um vento fresco algo maravilhoso
+   Q012    lyric         1.0000      1.0000      0.0000   1.000  BM25            cedo ou tarde vamos nos encontrar r
+   Q015    lyric         1.0000      0.3733      0.0000   1.000  BM25            mesmo que eu vá correndo sem direçã
+   Q038    genre         1.0000      1.0000      0.0000   1.000  BM25            forró
+   Q039    genre         1.0000      1.0000      0.0000   1.000  BM25            bossa nova MPB clássica
+   Q042    genre         1.0000      1.0000      0.0000   1.000  BM25            gospel louvor adoração
+   Q044    genre         1.0000      1.0000      0.0694   0.931  BM25            sertanejo universitário
+   Q040    genre         1.0000      1.0000      0.1478   0.852  BM25            samba pagode
+   Q041    genre         0.8237      0.4775      0.0000   0.824  BM25            funk carioca baile
+
+3. SISTEMA VENCEDOR POR INTENT (nDCG@10 médio)
+   -----------------------------------------------------------------
+   ALBUM   : BM25 (0.2626)
+            BM25          : 0.2626 <-- melhor
+            TF-IDF        : 0.2267
+            Dense         : 0.1416
+   ARTIST  : BM25 (0.2327)
+            BM25          : 0.2327 <-- melhor
+            TF-IDF        : 0.2304
+            Dense         : 0.1985
+   GENRE   : BM25 (0.9699)
+            BM25          : 0.9699 <-- melhor
+            TF-IDF        : 0.9206
+            Dense         : 0.0603
+   LYRIC   : BM25 (0.6348)
+            BM25          : 0.6348 <-- melhor
+            TF-IDF        : 0.5064
+            Dense         : 0.0936
+   TRACK   : TF-IDF (0.3133)
+            BM25          : 0.3019
+            TF-IDF        : 0.3133 <-- melhor
+            Dense         : 0.1646
+
+4. SCORES COMPLETOS — nDCG@10 POR QUERY
+   QID     Intent          BM25      TF-IDF       Dense    Média  Query
+   -----------------------------------------------------------------
+   Q001    lyric         0.2288      0.1199      0.0000   0.1162  não sabe o que é sofrer ter que ver
+   Q002    lyric         0.1637      0.1470      0.0000   0.1036  vida loka sofrimento e glória da fa
+   Q003    lyric         0.4317      0.5960      0.1993   0.4090  velha infância tribalistas
+   Q004    lyric         0.6045      0.5864      0.0000   0.3970  ela quer rolar na minha silverado c
+   Q005    lyric         0.6309      0.4307      0.3333   0.4650  depois de tantos planos de um futur
+   Q006    lyric         1.0000      1.0000      0.0000   0.6667  me encontra que espero a tanto temp
+   Q007    lyric         0.7003      0.4984      0.0000   0.3996  um minuto para o fim do mundo punk
+   Q008    lyric         0.8597      0.8597      0.1637   0.6277  louca por ti amor demais na praia n
+   Q009    lyric         1.0000      0.6309      0.0000   0.5436  há um vento fresco algo maravilhoso
+   Q010    lyric         0.2520      0.1138      0.0000   0.1219  coração partido não me acostumei di
+   Q011    lyric         0.0000      0.0000      0.0000   0.0000  amor o meu coração pede só pra te a
+   Q012    lyric         1.0000      1.0000      0.0000   0.6667  cedo ou tarde vamos nos encontrar r
+   Q013    lyric         1.0000      1.0000      0.7075   0.9025  poderosa olhar de diamante agita o
+   Q014    lyric         0.6509      0.2398      0.0000   0.2969  vai e vem não sai de órbita eita vi
+   Q015    lyric         1.0000      0.3733      0.0000   0.4578  mesmo que eu vá correndo sem direçã
+   Q016    track         0.3608      0.4672      0.0000   0.2760  Anna Júlia Los Hermanos
+   Q017    track         0.4266      0.4245      0.4080   0.4197  Velha Infância Tribalistas
+   Q018    track         0.2373      0.1804      0.0902   0.1693  Vida Loka Racionais MC's
+   Q019    track         0.1828      0.2075      0.1554   0.1819  Dormi Na Praça Chitãozinho Xororó
+   Q020    track         0.2581      0.2405      0.1804   0.2263  Obrigado por Estragar Tudo Marília
+   Q021    track         0.8190      0.7610      0.5287   0.7029  Me Ama Ou Me Larga Simone Mendes
+   Q022    track         0.4982      0.4793      0.0000   0.3258  Apaguei Pra Todos Ferrugem
+   Q023    track         0.2942      0.2942      0.0000   0.1961  Dias Atrás CPM 22
+   Q024    track         0.0000      0.0000      0.3053   0.1018  Depois Marisa Monte
+   Q025    track         0.3178      0.2919      0.1983   0.2693  Ovelhinha Isadora Pompeo
+   Q026    track         0.2276      0.4129      0.0000   0.2135  Silverado Luan Pereira sertanejo
+   Q027    track         0.0000      0.0000      0.1086   0.0362  Insônia Tribo da Periferia rap
+   Q028    artist        0.0000      0.0000      0.0734   0.0245  Djavan
+   Q029    artist        0.5302      0.7702      0.4000   0.5668  Racionais MC's rap
+   Q030    artist        0.2025      0.0784      0.0000   0.0936  Marília Mendonça sertanejo feminejo
+   Q031    artist        0.3679      0.2201      0.4537   0.3473  Chitãozinho e Xororó dupla sertanej
+   Q032    artist        0.8611      0.8611      0.7382   0.8202  Tribalistas MPB
+   Q033    artist        0.0000      0.0000      0.0000   0.0000  CPM 22 rock nacional
+   Q034    artist        0.0784      0.0851      0.0000   0.0545  Ferrugem pagode
+   Q035    artist        0.2201      0.2201      0.0000   0.1467  Calcinha Preta forró
+   Q036    artist        0.0000      0.0000      0.2344   0.0781  Isadora Pompeo gospel
+   Q037    artist        0.0663      0.0694      0.0851   0.0736  Jorge e Mateus sertanejo
+   Q038    genre         1.0000      1.0000      0.0000   0.6667  forró
+   Q039    genre         1.0000      1.0000      0.0000   0.6667  bossa nova MPB clássica
+   Q040    genre         1.0000      1.0000      0.1478   0.7159  samba pagode
+   Q041    genre         0.8237      0.4775      0.0000   0.4337  funk carioca baile
+   Q042    genre         1.0000      1.0000      0.0000   0.6667  gospel louvor adoração
+   Q043    genre         0.9653      0.9669      0.2048   0.7123  rap nacional hip hop brasileiro
+   Q044    genre         1.0000      1.0000      0.0694   0.6898  sertanejo universitário
+   Q045    album         0.2350      0.2350      0.4233   0.2978  album Tribalistas
+   Q046    album         0.0000      0.0000      0.0000   0.0000  Nada Como um Dia Após o Outro Dia R
+   Q047    album         0.5003      0.4396      0.4262   0.4554  Escândalo Íntimo Luísa Sonza
+   Q048    album         0.2874      0.2445      0.0000   0.1773  Caetano e Bethânia ao vivo album
+   Q049    album         0.5531      0.4413      0.0000   0.3315  Acústico Engenheiros do Hawaii
+   Q050    album         0.0000      0.0000      0.0000   0.0000  Grandes Sucessos Raça Negra pagode

@@ -1,5 +1,5 @@
 export type Intent = "artist" | "album" | "song" | "track" | "lyric" | "genre" | "none";
-export type SearchAlgorithm = "bm25" | "tfidf";
+export type SearchAlgorithm = "bm25" | "tfidf" | "dense";
 
 export interface SearchResultItem {
   id: string;
@@ -134,4 +134,8 @@ export interface HealthResponse {
   ok: boolean;
   tracks_indexed: number;
   entities: Record<string, number>;
+  dense_search?: {
+    available: boolean;
+    tracks_indexed: number;
+  };
 }

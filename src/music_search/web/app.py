@@ -74,8 +74,31 @@ async def lifespan(app: FastAPI):
         logger.warning("Warmup falhou (segue mesmo assim): %s", exc)
     logger.info("Warmup concluído em %.1fs", time.time() - warmup_started)
 
+    # Motor de busca densa (opcional — requer sentence-transformers + faiss)
+    try:
+        from music_search.motors.dense_search import (
+            DEFAULT_DENSE_INDEX_PATH,
+            DEFAULT_DENSE_META_PATH,
+            DenseSearchEngine,
+        )
+
+        if DEFAULT_DENSE_INDEX_PATH.exists() and DEFAULT_DENSE_META_PATH.exists():
+            dense_engine: DenseSearchEngine | None = DenseSearchEngine.load(
+                DEFAULT_DENSE_INDEX_PATH, DEFAULT_DENSE_META_PATH
+            )
+            assert dense_engine is not None
+            dense_engine.warmup()
+            logger.info("Motor denso carregado: %d docs", dense_engine.num_docs)
+        else:
+            logger.info("Índice denso não encontrado — /api/search/dense indisponível")
+            dense_engine = None
+    except ImportError:
+        logger.info("sentence-transformers/faiss não instalados — /api/search/dense indisponível")
+        dense_engine = None
+
     app.state.track_engine = track_engine
     app.state.multi = multi
+    app.state.dense_engine = dense_engine
     logger.info("Lifespan startup total: %.1fs", time.time() - started)
     yield
 
@@ -211,14 +234,24 @@ def healthz() -> dict[str, Any]:
     multi = getattr(app.state, "multi", None)
     entity_indexes = getattr(multi, "entity_indexes", {}) or {}
     entities = {k: v.num_docs for k, v in entity_indexes.items()}
-    return {"ok": True, "tracks_indexed": tracks, "entities": entities}
+    dense_engine = getattr(app.state, "dense_engine", None)
+    dense_docs = int(getattr(dense_engine, "num_docs", 0) or 0)
+    return {
+        "ok": True,
+        "tracks_indexed": tracks,
+        "entities": entities,
+        "dense_search": {
+            "available": dense_engine is not None,
+            "tracks_indexed": dense_docs,
+        },
+    }
 
 
 @app.get("/api/search", response_model=SearchResponse)
 def search(
     q: Annotated[str, Query(min_length=1, max_length=200)],
     top: Annotated[int, Query(ge=1, le=50)] = 10,
-    algorithm: Annotated[str, Query(pattern="^(bm25|tfidf)$")] = "bm25",
+    algorithm: Annotated[str, Query(pattern="^(bm25|tfidf|dense)$")] = "bm25",
     profile: Annotated[SearchProfile, Query()] = "balanced",
     bm25_k1: Annotated[float, Query(gt=0.0, le=3.0)] = 1.5,
     bm25_b: Annotated[float, Query(ge=0.0, le=1.0)] = 0.75,
@@ -226,12 +259,13 @@ def search(
 ) -> SearchResponse:
     started = time.time()
     intent = heuristic_intent(q)
+    sparse_algorithm = "bm25" if algorithm == "dense" else algorithm
 
     multi: MultiEntityIndex = app.state.multi
     routed = multi.search_routed(
         q,
         intent,
-        algorithm=algorithm,  # type: ignore[arg-type]
+        algorithm=sparse_algorithm,  # type: ignore[arg-type]
         top_k=top,
         profile=profile,
         bm25_k1=bm25_k1,
@@ -239,13 +273,27 @@ def search(
         tf_scheme=tf_scheme,
     )
     intent_used = routed["intent_used"]
+    response_algorithm = sparse_algorithm
+
+    if algorithm == "dense":
+        dense_engine = getattr(app.state, "dense_engine", None)
+        if dense_engine is None:
+            raise HTTPException(503, "motor de busca vetorial não disponível")
+        if intent_used == "track":
+            routed = {
+                "intent_used": "track",
+                "hits": [h.to_dict() for h in dense_engine.search(q, top_k=top)],
+            }
+            response_algorithm = "dense"
 
     # Para tracks, o hit vem do SparseSearchEngine ja como dict completo —
     # injetamos um campo `kind` para o conversor.
     hits = []
-    for h in routed["hits"]:
+    routed_hits = cast(list[dict[str, Any]], routed["hits"])
+    for raw_hit in routed_hits:
+        h = dict(raw_hit)
         if intent_used == "track":
-            h = {**h, "kind": "track"}
+            h["kind"] = "track"
         hits.append(hit_to_item(h))
 
     elapsed = int((time.time() - started) * 1000)
@@ -253,10 +301,32 @@ def search(
         query=q,
         intent_requested=cast(Intent, intent),
         intent_used=cast(Intent, intent_used),
-        algorithm=cast(SearchAlgorithm, algorithm),
+        algorithm=cast(SearchAlgorithm, response_algorithm),
         items=hits,
         rerank_used=False,
         elapsed_ms=elapsed,
+    )
+
+
+@app.get("/api/search/dense", response_model=SearchResponse)
+def search_dense(
+    q: Annotated[str, Query(min_length=1, max_length=200)],
+    top: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> SearchResponse:
+    dense_engine = getattr(app.state, "dense_engine", None)
+    if dense_engine is None:
+        raise HTTPException(503, "motor de busca vetorial não disponível")
+    started = time.time()
+    raw_hits = dense_engine.search(q, top_k=top)
+    items = [hit_to_item({**h.to_dict(), "kind": "track"}) for h in raw_hits]
+    return SearchResponse(
+        query=q,
+        intent_requested=cast(Intent, "track"),
+        intent_used=cast(Intent, "track"),
+        algorithm=cast(SearchAlgorithm, "dense"),
+        items=items,
+        rerank_used=False,
+        elapsed_ms=int((time.time() - started) * 1000),
     )
 
 

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryParam } from "../../../hooks/useQueryParam";
 import { useSearchSettings } from "../../../hooks/useSearchSettings";
@@ -14,6 +15,13 @@ export function AppShell() {
   const { settings, hasActiveOverrides, updateSettings, resetSettings } = useSearchSettings();
   const navigate = useNavigate();
   const health = useHealth();
+  const denseAvailable = health.data?.dense_search?.available ?? false;
+
+  useEffect(() => {
+    if (health.data && !denseAvailable && settings.algorithm === "dense") {
+      updateSettings({ algorithm: "bm25" });
+    }
+  }, [denseAvailable, health.data, settings.algorithm, updateSettings]);
 
   const stats = health.data
     ? [
@@ -27,10 +35,11 @@ export function AppShell() {
 
   const hasQuery = query.trim().length > 0;
   const settingsMenu = (
-    <SearchSettingsMenu
-      settings={settings}
-      hasActiveOverrides={hasActiveOverrides}
-      onUpdate={updateSettings}
+      <SearchSettingsMenu
+        settings={settings}
+        denseAvailable={denseAvailable}
+        hasActiveOverrides={hasActiveOverrides}
+        onUpdate={updateSettings}
       onReset={resetSettings}
     />
   );

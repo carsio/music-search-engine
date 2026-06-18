@@ -14,6 +14,7 @@ from music_search.web.app import (
     _album_response_from_payload,
     app,
     get_album,
+    healthz,
     search,
     search_lyric,
     serve_frontend_app,
@@ -191,6 +192,89 @@ def test_search_encaminha_parametros_avancados_ao_multi_index() -> None:
     }
 
 
+def test_search_dense_usa_bm25_para_rotear_e_substitui_tracks() -> None:
+    class _MultiStub:
+        def __init__(self) -> None:
+            self.kwargs = {}
+
+        def search_routed(self, *_args, **kwargs):
+            self.kwargs = kwargs
+            return {
+                "intent_used": "track",
+                "hits": [
+                    {
+                        "id": "sparse-track",
+                        "kind": "track",
+                        "rank": 1,
+                        "score": 1.0,
+                        "track_name": "Sparse Track",
+                    }
+                ],
+            }
+
+    class _DenseHit:
+        def to_dict(self):
+            return {
+                "id": "dense-track",
+                "kind": "track",
+                "rank": 1,
+                "score": 0.9,
+                "payload": {
+                    "track_name": "Dense Track",
+                    "artist_names": "Duo Mar",
+                    "lyrics_preview": "semantic match",
+                },
+            }
+
+    class _DenseEngineStub:
+        num_docs = 1
+
+        def __init__(self) -> None:
+            self.kwargs = {}
+
+        def search(self, *_args, **kwargs):
+            self.kwargs = kwargs
+            return [_DenseHit()]
+
+    app.state.multi = _MultiStub()
+    app.state.dense_engine = _DenseEngineStub()
+
+    response = search(q="neblina azul", top=3, algorithm="dense")
+
+    assert response.algorithm == "dense"
+    assert response.intent_used == "track"
+    assert response.items[0].id == "dense-track"
+    assert app.state.multi.kwargs["algorithm"] == "bm25"
+    assert app.state.dense_engine.kwargs == {"top_k": 3}
+
+
+def test_search_dense_preserva_resultado_nao_track_do_roteamento() -> None:
+    class _MultiStub:
+        def search_routed(self, *_args, **kwargs):
+            assert kwargs["algorithm"] == "bm25"
+            return {
+                "intent_used": "artist",
+                "hits": [
+                    {
+                        "id": "artist-1",
+                        "kind": "artist",
+                        "rank": 1,
+                        "score": 1.0,
+                        "payload": {"name": "Duo Mar", "genres": ["mpb"]},
+                    }
+                ],
+            }
+
+    app.state.multi = _MultiStub()
+    app.state.dense_engine = SimpleNamespace(num_docs=10)
+
+    response = search(q="duo mar", top=3, algorithm="dense")
+
+    assert response.algorithm == "bm25"
+    assert response.intent_used == "artist"
+    assert response.items[0].id == "artist-1"
+
+
 def test_search_lyric_respeita_max_snippets_e_parametros_avancados() -> None:
     class _TrackEngineStub:
         def __init__(self) -> None:
@@ -242,6 +326,16 @@ def test_healthz_exposto_em_api_prefix_sem_lifespan() -> None:
 
     assert response.status_code == 200
     assert response.json()["ok"] is True
+
+
+def test_healthz_inclui_status_do_indice_denso() -> None:
+    app.state.track_engine = SimpleNamespace(num_docs=3)
+    app.state.multi = SimpleNamespace(entity_indexes={"artist": SimpleNamespace(num_docs=2)})
+    app.state.dense_engine = SimpleNamespace(num_docs=1)
+
+    response = healthz()
+
+    assert response["dense_search"] == {"available": True, "tracks_indexed": 1}
 
 
 def test_spa_fallback_serves_asset_e_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

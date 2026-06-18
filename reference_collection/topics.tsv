@@ -1,0 +1,51 @@
+query_id	query_text	description	intent
+Q001	não sabe o que é sofrer ter que ver você sempre tão linda	Usuário lembra de um trecho de uma música romântica MPB sobre alguém lindo que causa sofrimento.	lyric
+Q002	vida loka sofrimento e glória da favela	Usuário busca músicas de rap nacional que falam sobre a vida difícil nas periferias brasileiras.	lyric
+Q003	velha infância tribalistas	Usuário quer encontrar a música sobre infância e nostalgia dos Tribalistas.	lyric
+Q004	ela quer rolar na minha silverado cowboy	Usuário quer encontrar uma música sertaneja sobre caminhonete e vida de cowboy.	lyric
+Q005	depois de tantos planos de um futuro para nós nos abandonamos	Usuário lembra de trecho de música sobre o fim de um relacionamento longo.	lyric
+Q006	me encontra que espero a tanto tempo em meio à multidão	Usuário busca a música do Charlie Brown Jr sobre esperar alguém especial.	lyric
+Q007	um minuto para o fim do mundo punk rock	Usuário busca música de rock brasileiro sobre urgência e fim do mundo.	lyric
+Q008	louca por ti amor demais na praia nos dois	Usuário busca música de forró ou arrocha sobre amor intenso à beira-mar.	lyric
+Q009	há um vento fresco algo maravilhoso está por vir gospel	Usuário busca música gospel de adoração sobre renovação e esperança.	lyric
+Q010	coração partido não me acostumei dividir você pagode	Usuário busca pagode que fala sobre o sofrimento de dividir o amor com outra pessoa.	lyric
+Q011	amor o meu coração pede só pra te amar ficar com você meu anjo	Usuário busca música de forró romântico sobre querer amar e ficar com alguém.	lyric
+Q012	cedo ou tarde vamos nos encontrar rock nacional	Usuário busca música de rock nacional sobre destino e encontro inevitável.	lyric
+Q013	poderosa olhar de diamante agita o salão funk	Usuário lembra de funk dos anos 2000 que elogia mulher elegante e poderosa.	lyric
+Q014	vai e vem não sai de órbita eita vida torta sertanejo	Usuário busca música sertaneja de Marília Mendonça sobre relacionamento complicado.	lyric
+Q015	mesmo que eu vá correndo sem direção ainda assim vou lutar gospel	Usuário busca música gospel sobre perseverança mesmo sem direção clara.	lyric
+Q016	Anna Júlia Los Hermanos	Usuário quer encontrar a música 'Anna Júlia' da banda Los Hermanos.	track
+Q017	Velha Infância Tribalistas	Usuário quer a música 'Velha Infância' do grupo Tribalistas.	track
+Q018	Vida Loka Racionais MC's	Usuário procura 'Vida Loka Pt. 1' dos Racionais MC's.	track
+Q019	Dormi Na Praça Chitãozinho Xororó	Usuário busca a música 'Dormi Na Praça' da dupla sertaneja Chitãozinho & Xororó.	track
+Q020	Obrigado por Estragar Tudo Marília Mendonça	Usuário quer encontrar a música da Marília Mendonça sobre término de relacionamento.	track
+Q021	Me Ama Ou Me Larga Simone Mendes	Usuário busca a música 'Me Ama Ou Me Larga' de Simone Mendes.	track
+Q022	Apaguei Pra Todos Ferrugem	Usuário quer a música 'Apaguei Pra Todos' do cantor Ferrugem.	track
+Q023	Dias Atrás CPM 22	Usuário busca a música 'Dias Atrás' da banda de rock CPM 22.	track
+Q024	Depois Marisa Monte	Usuário quer a música 'Depois' de Marisa Monte sobre fim de um amor.	track
+Q025	Ovelhinha Isadora Pompeo	Usuário busca a música gospel 'Ovelhinha' de Isadora Pompeo.	track
+Q026	Silverado Luan Pereira sertanejo	Usuário quer encontrar a música 'Silverado' do sertanejo Luan Pereira.	track
+Q027	Insônia Tribo da Periferia rap	Usuário busca a música 'Insônia' do grupo de rap Tribo da Periferia.	track
+Q028	Djavan	Usuário quer músicas do cantor e compositor Djavan, referência da MPB.	artist
+Q029	Racionais MC's rap	Usuário quer músicas do grupo Racionais MC's, ícone do rap nacional.	artist
+Q030	Marília Mendonça sertanejo feminejo	Usuário quer ouvir músicas da cantora sertaneja Marília Mendonça.	artist
+Q031	Chitãozinho e Xororó dupla sertaneja	Usuário quer músicas da dupla sertaneja clássica Chitãozinho & Xororó.	artist
+Q032	Tribalistas MPB	Usuário quer músicas do grupo Tribalistas formado por Carlinhos Brown, Marisa Monte e Arnaldo Antunes.	artist
+Q033	CPM 22 rock nacional	Usuário quer músicas da banda de rock CPM 22.	artist
+Q034	Ferrugem pagode	Usuário quer músicas do cantor de pagode Ferrugem.	artist
+Q035	Calcinha Preta forró	Usuário quer músicas da banda de forró Calcinha Preta.	artist
+Q036	Isadora Pompeo gospel	Usuário quer músicas da cantora gospel Isadora Pompeo.	artist
+Q037	Jorge e Mateus sertanejo	Usuário quer músicas da dupla sertaneja Jorge & Mateus.	artist
+Q038	forró	Usuário quer músicas do gênero forró, ritmo nordestino.	genre
+Q039	bossa nova MPB clássica	Usuário quer músicas de bossa nova e MPB tradicional brasileira.	genre
+Q040	samba pagode	Usuário quer músicas do gênero samba e pagode brasileiro.	genre
+Q041	funk carioca baile	Usuário quer músicas do funk carioca para baile.	genre
+Q042	gospel louvor adoração	Usuário quer músicas gospel evangélicas de louvor e adoração.	genre
+Q043	rap nacional hip hop brasileiro	Usuário quer músicas de rap e hip hop produzidas no Brasil.	genre
+Q044	sertanejo universitário	Usuário quer músicas do sertanejo universitário contemporâneo.	genre
+Q045	album Tribalistas	Usuário quer as músicas do álbum homônimo 'Tribalistas' do grupo Tribalistas.	album
+Q046	Nada Como um Dia Após o Outro Dia Racionais	Usuário quer as músicas do álbum duplo 'Nada Como um Dia Após o Outro Dia' dos Racionais MC's.	album
+Q047	Escândalo Íntimo Luísa Sonza	Usuário quer as músicas do álbum 'Escândalo Íntimo' de Luísa Sonza.	album
+Q048	Caetano e Bethânia ao vivo album	Usuário quer as músicas do álbum ao vivo de Caetano Veloso e Maria Bethânia.	album
+Q049	Acústico Engenheiros do Hawaii	Usuário quer as faixas do álbum acústico ao vivo dos Engenheiros do Hawaii.	album
+Q050	Grandes Sucessos Raça Negra pagode	Usuário quer o álbum de grandes sucessos do grupo de pagode Raça Negra.	album

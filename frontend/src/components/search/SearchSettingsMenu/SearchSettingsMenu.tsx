@@ -12,6 +12,7 @@ import styles from "./SearchSettingsMenu.module.css";
 
 interface SearchSettingsMenuProps {
   settings: SearchSettings;
+  denseAvailable: boolean;
   hasActiveOverrides: boolean;
   onUpdate: (patch: Partial<SearchSettings>) => void;
   onReset: () => void;
@@ -39,11 +40,14 @@ const TF_SCHEME_COPY: Record<SearchTfScheme, string> = {
 };
 
 function formatAlgorithmLabel(settings: SearchSettings) {
-  return settings.algorithm === "bm25" ? "BM25" : "TF-IDF";
+  if (settings.algorithm === "bm25") return "BM25";
+  if (settings.algorithm === "tfidf") return "TF-IDF";
+  return "Vetorial";
 }
 
 export function SearchSettingsMenu({
   settings,
+  denseAvailable,
   hasActiveOverrides,
   onUpdate,
   onReset,
@@ -142,6 +146,14 @@ export function SearchSettingsMenu({
               >
                 TF-IDF
               </Chip>
+              {denseAvailable ? (
+                <Chip
+                  active={settings.algorithm === "dense"}
+                  onClick={() => onUpdate({ algorithm: "dense" })}
+                >
+                  Vetorial Densa
+                </Chip>
+              ) : null}
             </div>
 
             <label className={styles.rangeField}>
@@ -189,7 +201,11 @@ export function SearchSettingsMenu({
               <span className={styles.sectionMeta}>{formatAlgorithmLabel(settings)}</span>
             </div>
 
-            {settings.algorithm === "bm25" ? (
+            {settings.algorithm === "dense" ? (
+              <p className={styles.footerNote}>
+                Busca por similaridade semântica (embeddings). Não há hiperparâmetros ajustáveis.
+              </p>
+            ) : settings.algorithm === "bm25" ? (
               <div className={styles.advancedGrid}>
                 <label className={styles.rangeField}>
                   <span className={styles.rangeHead}>
