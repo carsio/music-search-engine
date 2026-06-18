@@ -477,30 +477,33 @@ detalha a distribuição por intenção de busca.
 
 \begin{table}[ht]
 \centering
-\begin{minipage}[t]{0.54\linewidth}
+\setlength{\tabcolsep}{4pt}
+\begin{minipage}[t]{0.56\linewidth}
 \centering
 \caption{Estatísticas da coleção de referência.}
 \label{tab:stats}
+\small
 \begin{tabular}{lr}
 \toprule
 \textbf{Grandeza} & \textbf{Valor} \\
 \midrule
-Consultas (\textit{topics})                  & 50 \\
-Sistemas no \textit{pool}                     & 3 \\
-Pares (consulta, doc.) julgados               & 1.604 \\
-Grau 2 --- Altamente relevante                & 380 (23{,}7\%) \\
-Grau 1 --- Parcialmente relevante             & 171 (10{,}7\%) \\
-Grau 0 --- Não relevante                      & 1.053 (65{,}6\%) \\
-Consultas com $\geq 1$ relevante              & 50 (100\%) \\
-Média de docs.\ julgados/consulta             & 32{,}1 \\
-Média de docs.\ relevantes/consulta           & 11{,}0 \\
+Consultas (\textit{topics})        & 50 \\
+Sistemas no \textit{pool}          & 3 \\
+Pares (q, doc) julgados            & 1.604 \\
+Grau 2 (alta relevância)           & 380 (23{,}7\%) \\
+Grau 1 (parcial)                   & 171 (10{,}7\%) \\
+Grau 0 (não relevante)             & 1.053 (65{,}6\%) \\
+Consultas com $\geq 1$ rel.        & 50 (100\%) \\
+Méd.\ julgados/consulta            & 32{,}1 \\
+Méd.\ relevantes/consulta          & 11{,}0 \\
 \bottomrule
 \end{tabular}
 \end{minipage}\hfill
-\begin{minipage}[t]{0.44\linewidth}
+\begin{minipage}[t]{0.42\linewidth}
 \centering
 \caption{Documentos relevantes por intenção de busca.}
 \label{tab:relintent}
+\small
 \begin{tabular}{lrrr}
 \toprule
 \textbf{Intent} & \textbf{N} & \textbf{Rel.} & \textbf{Méd./q} \\

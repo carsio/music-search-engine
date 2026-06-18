@@ -10,13 +10,14 @@ Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFA
 | 📊 Slides (apresentação) | <https://carsio.github.io/music-search-engine/> |
 | 📄 Relatório técnico (PDF) | [main.pdf](https://github.com/carsio/music-search-engine/releases/download/report-latest/main.pdf) |
 | 📚 Wiki (setup, uso, pipeline) | <https://github.com/carsio/music-search-engine/wiki> |
-| 📖 Guia conceitual (RI do zero) | [`docs/GUIA.md`](docs/GUIA.md) |
+| 📖 Guia conceitual (RI do zero) | [Wiki › Guia](https://github.com/carsio/music-search-engine/wiki/Guia) |
 
 > Quer **rodar** ou entender a operação do sistema? Setup, modos de uso, pipeline
 > de dados e estrutura do repositório estão na
 > **[Wiki](https://github.com/carsio/music-search-engine/wiki)**. Para entender o
 > sistema do começo ao fim (conceitos de RI, BM25/TF-IDF com fórmulas, motores e
-> o trajeto de uma query), comece por **[`docs/GUIA.md`](docs/GUIA.md)**.
+> o trajeto de uma query), comece pelo
+> **[Guia conceitual na Wiki](https://github.com/carsio/music-search-engine/wiki/Guia)**.
 
 ## Visão geral
 
@@ -68,9 +69,7 @@ Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.js
 > Detalhamento de cada subsistema e dos atalhos do VSCode:
 > [Wiki › Estrutura do Repositório](https://github.com/carsio/music-search-engine/wiki/Estrutura-do-Repositorio).
 
-## Status — feito vs falta
-
-### ✅ Pronto
+## Status
 
 - Pipeline RI clássico: preprocessing, índice invertido multi-campo, BM25, TF-IDF
 - Motor esparso multi-campo com pesos configuráveis (`SparseSearchEngine`)
@@ -83,11 +82,6 @@ Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.js
 - API FastAPI (`/search`, `/search/lyric`, `/artist`, `/album`, `/song`) + frontend React/Vite
 - Avaliação estilo TREC (50 consultas, 1.604 julgamentos) com métricas MRR, MAP, nDCG@10, P@10, Bpref e testes de Wilcoxon
 - CI (`.github/workflows/ci.yml`) para lint, format, type check e pytest
-
-### 🟡 Em andamento
-
-- **Álbuns e compositores enriquecidos**: `br_albums.parquet` e `br_composers.parquet` ainda não entram no snapshot versionado atual.
-- **Cobertura do `MultiEntityIndex`**: artist e genre já carregam do manifesto atual, mas album/composer ainda dependem dos exports restantes.
 
 ## Equipe
 
