@@ -90,6 +90,14 @@ Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.js
 - [Raquel de Sá](https://github.com/raqueldesa)
 - [Lelson Nascimento](https://github.com/lelsonln)
 
+## Referências do Modelo Vetorial Denso usado
+
+REIMERS, Nils; GUREVYCH, Iryna. **Sentence-BERT: Sentence Embeddings using 
+  Siamese BERT-Networks**. In: *Proceedings of the 2019 Conference on Empirical 
+  Methods in Natural Language Processing*. Association for Computational
+  Linguistics, nov. 2019. Disponível em: <http://arxiv.org/abs/1908.10084>.
+
 ## Licença
 
 MIT
+
