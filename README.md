@@ -21,7 +21,7 @@ Trabalho da disciplina ICC222 — Tópicos em Recuperação de Informação (UFA
 
 ## Visão geral
 
-O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, BM25) e a busca vetorial densa (embeddings + Milvus), e expõe esse motor através de uma API FastAPI consumida por um frontend React. Os dados foram curados a partir do Spotify Metadata e enriquecidos com letras (lyrics.ovh, Vagalume, letras.mus.br, Genius) e conteúdo da Wikipedia PT materializado de forma determinística para as entidades.
+O projeto implementa os algoritmos clássicos de RI (índice invertido, TF-IDF, BM25) e a busca vetorial densa (embeddings + FAISS + sentence-transformers), e expõe esse motor através de uma API FastAPI consumida por um frontend React. Os dados foram curados a partir do Spotify Metadata e enriquecidos com letras (lyrics.ovh, Vagalume, letras.mus.br, Genius) e conteúdo da Wikipedia PT materializado de forma determinística para as entidades.
 
 O fluxo principal hoje é: a API em `music_search.web.app` recebe a query, classifica a intent via heurística determinística, delega o roteamento para `multi_index.MultiEntityIndex`, consulta o índice esparso ou a dimensão apropriada e devolve a resposta para a SPA em `frontend/`.
 
@@ -48,7 +48,8 @@ Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.js
 │  motors.search.SparseSearchEngine   (multi-campo sobre tracks)  │
 │  motors.multi_index.MultiEntityIndex (track/artist/album/...)   │
 │  data.albums              (catálogo derivado para /album/{id})  │
-│  vector.VectorSearch         (embeddings + Milvus)              │
+│  vector.VectorSearch          (embeddings + FAISS               │
+│                                 + sentence-transformers)        │
 └─────────────────────────────────────────────────────────────────┘
                               ↑
 ┌─────────────────────────────────────────────────────────────────┐
@@ -74,7 +75,7 @@ Snapshot atual do dataset versionado (`data/derived/final/br_dataset_manifest.js
 - Pipeline RI clássico: preprocessing, índice invertido multi-campo, BM25, TF-IDF
 - Motor esparso multi-campo com pesos configuráveis (`SparseSearchEngine`)
 - Roteamento via `MultiEntityIndex` com fallback gracioso quando alguma dimensão ainda não existe
-- Busca vetorial com Ollama/OpenAI + Milvus Lite
+- Busca vetorial com embeddings + FAISS + sentence-transformers
 - Catálogo de álbuns derivado do dataset de tracks e endpoint `/album/{id}`
 - Dataset versionado com **50.000 faixas brasileiras**, **36.017 músicas com letra**, **7.255 artistas** e **42 gêneros**
 - Pipeline de letras com cache, retries, circuit breaker e cascata de fontes
